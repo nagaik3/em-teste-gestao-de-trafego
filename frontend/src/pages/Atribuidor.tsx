@@ -1,14 +1,19 @@
 import { useState } from "react"
 import { useCounts, useTasks, useTaskDetail, useClaim } from "../api/hooks"
-import { useAuth } from "../auth/AuthContext"
 
 const NICHOS = ["EM", "MM", "DB", "ED", "DA", "NE", "PT", "ZB", "ME"]
+const GESTORES = [
+  { nome: "Lucas Cavalcanti", key: "lucas" },
+  { nome: "Ludson Chaves", key: "ludson" },
+  { nome: "Douglas Oliveira", key: "douglas" },
+  { nome: "Gustavo Lisner", key: "gustavo" },
+]
 const gold = "#D4A847", goldDim = "rgba(212,168,71,0.12)", card = "#12151c", border = "#252a38", surface = "#0d0f14"
 
 function daysAgo(ts: number) { return Math.floor((Date.now() - ts) / 86400000) }
 
 export default function Atribuidor() {
-  const { user, logout } = useAuth()
+  const [gestor, setGestor] = useState<typeof GESTORES[0] | null>(null)
   const [nicho, setNicho] = useState<string | null>(null)
   const [regiao, setRegiao] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -22,8 +27,8 @@ export default function Atribuidor() {
   function getCount(n: string, r?: string) { return counts.filter(c => c.nicho === n && (!r || c.regiao === r)).reduce((s, c) => s + c.count, 0) }
 
   function handleClaim() {
-    if (!selectedId) return
-    claim.mutate({ taskId: selectedId }, {
+    if (!selectedId || !gestor) return
+    claim.mutate({ taskId: selectedId, gestorNome: gestor.nome }, {
       onSuccess: () => { setShowConfirm(false); setSelectedId(null); refetch() },
     })
   }
@@ -33,15 +38,41 @@ export default function Atribuidor() {
     background: active ? gold : "transparent", color: active ? "#08090c" : "#8b90a0", cursor: "pointer", transition: "all 0.2s",
   })
 
+  // Step 1: Gestor picker
+  if (!gestor) {
+    return (
+      <div style={{ maxWidth: 500, margin: "0 auto", padding: 24, paddingTop: 80 }}>
+        <h1 style={{ color: gold, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Atribuidor de Testes</h1>
+        <p style={{ color: "#8b90a0", fontSize: 14, marginBottom: 32 }}>Selecione seu nome para continuar</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {GESTORES.map(g => (
+            <button key={g.key} onClick={() => setGestor(g)} style={{
+              display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", background: card, border: `1px solid ${border}`,
+              borderRadius: 10, cursor: "pointer", transition: "all 0.15s", textAlign: "left",
+            }}
+            onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = gold }}
+            onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = border }}
+            >
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: gold, display: "flex", alignItems: "center", justifyContent: "center", color: "#08090c", fontWeight: 700, fontSize: 16 }}>
+                {g.nome.charAt(0)}
+              </div>
+              <span style={{ color: "#eceef2", fontSize: 15, fontWeight: 500 }}>{g.nome}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <div>
           <h1 style={{ color: gold, fontSize: 22, fontWeight: 700, margin: 0 }}>Atribuidor de Testes</h1>
-          <p style={{ color: "#8b90a0", fontSize: 13, margin: "4px 0 0" }}>{user?.nome}</p>
+          <p style={{ color: "#8b90a0", fontSize: 13, margin: "4px 0 0" }}>{gestor.nome}</p>
         </div>
-        <button onClick={logout} style={{ background: "transparent", border: `1px solid ${border}`, borderRadius: 8, padding: "6px 16px", color: "#8b90a0", fontSize: 12, cursor: "pointer" }}>Sair</button>
+        <button onClick={() => { setGestor(null); setNicho(null); setRegiao(null); setSelectedId(null) }} style={{ background: "transparent", border: `1px solid ${border}`, borderRadius: 8, padding: "6px 16px", color: "#8b90a0", fontSize: 12, cursor: "pointer" }}>Trocar Gestor</button>
       </div>
 
       {/* Nicho picker */}
@@ -127,10 +158,10 @@ export default function Atribuidor() {
               </div>
             ))}
             <div style={{ background: goldDim, border: `1px solid ${gold}33`, borderRadius: 10, padding: 12, marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: "50%", background: gold, display: "flex", alignItems: "center", justifyContent: "center", color: "#08090c", fontWeight: 700, fontSize: 14 }}>{user?.nome?.charAt(0) || "?"}</div>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: gold, display: "flex", alignItems: "center", justifyContent: "center", color: "#08090c", fontWeight: 700, fontSize: 14 }}>{gestor.nome.charAt(0)}</div>
               <div>
                 <p style={{ color: "#8b90a0", fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>Gestor responsavel</p>
-                <p style={{ color: "#eceef2", fontSize: 14, fontWeight: 500 }}>{user?.nome}</p>
+                <p style={{ color: "#eceef2", fontSize: 14, fontWeight: 500 }}>{gestor.nome}</p>
               </div>
             </div>
             <button onClick={() => setShowConfirm(true)} style={{ width: "100%", padding: 14, background: gold, color: "#08090c", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Iniciar Teste</button>
@@ -143,7 +174,7 @@ export default function Atribuidor() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60 }}>
           <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 24, width: 400, maxWidth: "90vw" }}>
             <p style={{ color: gold, fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Confirmar Inicio de Teste</p>
-            <p style={{ color: "#8b90a0", fontSize: 13, marginBottom: 16 }}>Voce (<strong style={{ color: "#eceef2" }}>{user?.nome}</strong>) sera atribuido como gestor. A tarefa sera movida para <strong style={{ color: "#eceef2" }}>Em Teste</strong> e o copywriter sera notificado.</p>
+            <p style={{ color: "#8b90a0", fontSize: 13, marginBottom: 16 }}><strong style={{ color: "#eceef2" }}>{gestor.nome}</strong> sera atribuido como gestor. A tarefa sera movida para <strong style={{ color: "#eceef2" }}>Em Teste</strong> e o copywriter sera notificado.</p>
             <div style={{ background: "#181b24", border: `1px solid ${border}`, borderRadius: 8, padding: 12, marginBottom: 20 }}>
               <p style={{ fontFamily: "monospace", fontSize: 12, color: "#eceef2", wordBreak: "break-all" }}>{detail.name}</p>
             </div>

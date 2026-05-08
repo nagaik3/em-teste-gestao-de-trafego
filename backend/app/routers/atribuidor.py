@@ -1,9 +1,8 @@
 """Atribuidor de Testes — endpoints."""
 from collections import defaultdict
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from app.auth import get_current_user
 from app.config import (
     CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP, COPYWRITER_USER_MAP,
     CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES,
@@ -56,8 +55,7 @@ def _task_detail(t):
 
 
 @router.get("/counts")
-def counts(request: Request):
-    get_current_user(request)
+def counts():
     tasks = get_list_tasks(CLICKUP_LIST_TRAFEGO, statuses=["aguardando teste"])
     c = defaultdict(lambda: defaultdict(int))
     for t in tasks:
@@ -72,8 +70,7 @@ def counts(request: Request):
 
 
 @router.get("/tasks")
-def list_tasks(request: Request, nicho: str = Query(...), regiao: str = Query("BR")):
-    get_current_user(request)
+def list_tasks(nicho: str = Query(...), regiao: str = Query("BR")):
     tasks = get_list_tasks(CLICKUP_LIST_TRAFEGO, statuses=["aguardando teste"])
     filtered = []
     for t in tasks:
@@ -88,8 +85,7 @@ def list_tasks(request: Request, nicho: str = Query(...), regiao: str = Query("B
 
 
 @router.get("/tasks/{task_id}")
-def task_detail(task_id: str, request: Request):
-    get_current_user(request)
+def task_detail(task_id: str):
     try:
         return _task_detail(get_task_detail(task_id))
     except Exception as e:
@@ -97,13 +93,12 @@ def task_detail(task_id: str, request: Request):
 
 
 class ClaimRequest(BaseModel):
-    gestor_nome: Optional[str] = None
+    gestor_nome: str
 
 
 @router.post("/tasks/{task_id}/claim")
-def claim_task(task_id: str, body: ClaimRequest, request: Request):
-    user = get_current_user(request)
-    gestor_name = body.gestor_nome or user.get("nome", "")
+def claim_task(task_id: str, body: ClaimRequest):
+    gestor_name = body.gestor_nome
     gestor_key = gestor_name.split()[0].lower() if gestor_name else ""
     gestor_cu_id = GESTOR_CLICKUP_MAP.get(gestor_key)
 
@@ -132,4 +127,4 @@ def claim_task(task_id: str, body: ClaimRequest, request: Request):
     except Exception:
         pass
 
-    return {"status": "ok", "task_id": task_id, "new_status": "em teste"}
+    return {"status": "ok", "task_id": task_id, "new_status": "em teste", "gestor": gestor_name}

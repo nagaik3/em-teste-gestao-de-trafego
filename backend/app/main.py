@@ -1,10 +1,8 @@
-import os
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from app.auth import router as auth_router
 from app.routers.atribuidor import router as atribuidor_router
 
 app = FastAPI(title="Atribuidor de Testes — IMPERA")
@@ -17,7 +15,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
 app.include_router(atribuidor_router)
 
 

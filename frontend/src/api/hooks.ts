@@ -27,7 +27,7 @@ export function useTaskDetail(id?: string | null) {
 
 export function useClaim() {
   return useMutation({
-    mutationFn: ({ taskId, gestorNome }: { taskId: string; gestorNome?: string }) =>
+    mutationFn: ({ taskId, gestorNome }: { taskId: string; gestorNome: string }) =>
       apiPost(`/api/atribuidor/tasks/${taskId}/claim`, { gestor_nome: gestorNome }),
   })
 }
