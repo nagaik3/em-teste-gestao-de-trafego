@@ -126,7 +126,14 @@ export default function Atribuidor() {
                 </div>)}
               </div>
             ))}
-            <button onClick={() => setShowConfirm(true)} style={{ width: "100%", padding: 14, background: gold, color: "#08090c", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 8 }}>Iniciar Teste</button>
+            <div style={{ background: goldDim, border: `1px solid ${gold}33`, borderRadius: 10, padding: 12, marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: gold, display: "flex", alignItems: "center", justifyContent: "center", color: "#08090c", fontWeight: 700, fontSize: 14 }}>{user?.nome?.charAt(0) || "?"}</div>
+              <div>
+                <p style={{ color: "#8b90a0", fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>Gestor responsavel</p>
+                <p style={{ color: "#eceef2", fontSize: 14, fontWeight: 500 }}>{user?.nome}</p>
+              </div>
+            </div>
+            <button onClick={() => setShowConfirm(true)} style={{ width: "100%", padding: 14, background: gold, color: "#08090c", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Iniciar Teste</button>
           </div>
         </div>
       )}
@@ -136,7 +143,7 @@ export default function Atribuidor() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60 }}>
           <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 24, width: 400, maxWidth: "90vw" }}>
             <p style={{ color: gold, fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Confirmar Inicio de Teste</p>
-            <p style={{ color: "#8b90a0", fontSize: 13, marginBottom: 16 }}>A tarefa sera movida para <strong style={{ color: "#eceef2" }}>Em Teste</strong> e o copywriter sera notificado.</p>
+            <p style={{ color: "#8b90a0", fontSize: 13, marginBottom: 16 }}>Voce (<strong style={{ color: "#eceef2" }}>{user?.nome}</strong>) sera atribuido como gestor. A tarefa sera movida para <strong style={{ color: "#eceef2" }}>Em Teste</strong> e o copywriter sera notificado.</p>
             <div style={{ background: "#181b24", border: `1px solid ${border}`, borderRadius: 8, padding: 12, marginBottom: 20 }}>
               <p style={{ fontFamily: "monospace", fontSize: 12, color: "#eceef2", wordBreak: "break-all" }}>{detail.name}</p>
             </div>
