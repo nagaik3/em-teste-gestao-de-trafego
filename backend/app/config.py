@@ -14,6 +14,7 @@ GESTOR_CLICKUP_MAP = {
     "ludson": 82074473,
     "douglas": 82118000,
     "gustavo": 82168803,
+    "gabriel": 105940694,
 }
 
 # Copywriter dropdown → ClickUp user ID (para @mention)

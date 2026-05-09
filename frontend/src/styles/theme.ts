@@ -25,6 +25,7 @@ export const GESTORES = [
   { nome: "Ludson Chaves", key: "ludson" },
   { nome: "Douglas Oliveira", key: "douglas" },
   { nome: "Gustavo Lisner", key: "gustavo" },
+  { nome: "Gabriel Fraza", key: "gabriel" },
 ]
 
 export const pill = (active: boolean): React.CSSProperties => ({

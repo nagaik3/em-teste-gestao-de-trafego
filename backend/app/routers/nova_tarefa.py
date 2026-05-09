@@ -43,6 +43,7 @@ GESTORES = [
     {"key": "ludson", "nome": "Ludson Chaves"},
     {"key": "douglas", "nome": "Douglas Oliveira"},
     {"key": "gustavo", "nome": "Gustavo Lisner"},
+    {"key": "gabriel", "nome": "Gabriel Fraza"},
 ]
 
 GESTOR_DROPDOWN_OPTIONS = {
@@ -50,6 +51,7 @@ GESTOR_DROPDOWN_OPTIONS = {
     "ludson": "5aea1aea-e3ad-454d-8fbd-774dbb740d2c",
     "douglas": "377c1e98-e147-4880-883b-9c20db3494c1",
     "gustavo": "0068cbe7-a170-4e79-b140-6903ad3b43f3",
+    "gabriel": "5e557310-28d0-4ba0-b71c-e434f5679e3e",
 }
 
 
