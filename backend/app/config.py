@@ -1,6 +1,7 @@
 import os
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "impera-atribuidor-secret-2026")
+REDTRACK_API_KEY = os.environ.get("REDTRACK_API_KEY", "")
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_EXPIRE_MINUTES = 60 * 24  # 24h
 

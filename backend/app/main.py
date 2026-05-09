@@ -4,8 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.routers.atribuidor import router as atribuidor_router
+from app.routers.gestao import router as gestao_router
+from app.routers.nova_tarefa import router as nova_tarefa_router
+from app.routers.performance import router as performance_router
 
-app = FastAPI(title="Atribuidor de Testes — IMPERA")
+app = FastAPI(title="Gestao de Testes — IMPERA")
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,6 +19,9 @@ app.add_middleware(
 )
 
 app.include_router(atribuidor_router)
+app.include_router(gestao_router)
+app.include_router(nova_tarefa_router)
+app.include_router(performance_router)
 
 
 @app.get("/health")

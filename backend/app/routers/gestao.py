@@ -1,0 +1,252 @@
+"""Gestao de Testes — endpoints para gerenciar criativos ativos."""
+import re
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
+from app.config import (
+    CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP,
+    CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES, CF_GESTOR_DROPDOWN,
+)
+from app.services.clickup import (
+    get_list_tasks, get_task_detail, get_cf_value,
+    clickup_post, clickup_get,
+)
+from app.services.redtrack import get_performance_for_task
+
+router = APIRouter(prefix="/api/gestao", tags=["gestao"])
+
+ACTIVE_STATUSES = [
+    "em teste", "pré-escala", "validado", "escala",
+    "em risco", "negativo", "pausado",
+]
+
+
+def parse_creative_range(task_name: str) -> list:
+    """Parse [V122-V148] or [AD21-AD25] into individual codes."""
+    results = []
+    # Match ranges like [V122-V148], [V1-V20], [AD21-AD25], [AD21-25]
+    for m in re.finditer(r'\[([A-Z]+)(\d+)-\1?(\d+)\]', task_name):
+        prefix = m.group(1)
+        start = int(m.group(2))
+        end = int(m.group(3))
+        for i in range(start, end + 1):
+            results.append(f"{prefix}{i}")
+    if results:
+        return results
+
+    # Try implicit prefix: [V122-148]
+    for m in re.finditer(r'\[([A-Z]+)(\d+)-(\d+)\]', task_name):
+        prefix = m.group(1)
+        start = int(m.group(2))
+        end = int(m.group(3))
+        if end > start:
+            for i in range(start, end + 1):
+                results.append(f"{prefix}{i}")
+    if results:
+        return results
+
+    # Single creative: [V123] or [AD21]
+    singles = re.findall(r'\[(V\d+|AD\d+)\](?!\[)', task_name)
+    return singles
+
+
+def build_subtask_name(parent_name: str, creative_code: str) -> str:
+    """Replace the range bracket with a single creative code."""
+    # Replace [V122-V148] or [AD21-AD25] with [V123] or [AD22]
+    result = re.sub(r'\[[A-Z]+\d+-\d+\]', f'[{creative_code}]', parent_name, count=1)
+    # Remove [V1] at end if it exists (it's a version marker for the batch, not the individual)
+    result = re.sub(r'\[V1\]$', '', result)
+    return result
+
+
+def _task_summary(t):
+    name = t.get("name", "")
+    nicho = get_cf_value(t, CF_NICHO) or ""
+    return {
+        "id": t["id"],
+        "name": name,
+        "nicho": nicho.split(" - ")[0].strip() if nicho else "",
+        "oferta": get_cf_value(t, CF_OFERTA),
+        "fonte": get_cf_value(t, CF_FONTE),
+        "copywriter": get_cf_value(t, CF_COPYWRITER),
+        "editor": get_cf_value(t, CF_EDITOR),
+        "status": t["status"]["status"],
+        "creative_count": len(parse_creative_range(name)),
+        "date_created": int(t.get("date_created", "0")),
+    }
+
+
+@router.get("/tasks")
+def list_tasks(gestor: str = Query(...)):
+    """Get all active tasks for a gestor, grouped by status."""
+    gestor_cu_id = GESTOR_CLICKUP_MAP.get(gestor.lower())
+    if not gestor_cu_id:
+        raise HTTPException(status_code=400, detail=f"Gestor '{gestor}' nao encontrado")
+
+    all_tasks = get_list_tasks(CLICKUP_LIST_TRAFEGO, statuses=ACTIVE_STATUSES)
+
+    # Filter by assignee and get subtask counts
+    tasks_by_status = {}
+    subtask_counts = {}
+
+    for t in all_tasks:
+        if t.get("parent"):
+            # Count subtasks per parent
+            pid = t["parent"]
+            subtask_counts[pid] = subtask_counts.get(pid, 0) + 1
+            continue
+
+        # Check if gestor is assigned
+        assignee_ids = [a.get("id") for a in t.get("assignees", [])]
+        if gestor_cu_id not in assignee_ids:
+            continue
+
+        status = t["status"]["status"]
+        if status not in tasks_by_status:
+            tasks_by_status[status] = []
+
+        summary = _task_summary(t)
+        tasks_by_status[status].append(summary)
+
+    # Add subtask counts and sort
+    groups = []
+    for status in ACTIVE_STATUSES:
+        tasks = tasks_by_status.get(status, [])
+        for task in tasks:
+            task["moved_count"] = subtask_counts.get(task["id"], 0)
+        tasks.sort(key=lambda x: x["date_created"])
+        if tasks:
+            groups.append({"status": status, "count": len(tasks), "tasks": tasks})
+
+    return {"groups": groups}
+
+
+@router.get("/tasks/{task_id}/creatives")
+def task_creatives(task_id: str, gestor: str = Query(...)):
+    """Expand a task into individual creatives with performance data."""
+    try:
+        task = get_task_detail(task_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    name = task.get("name", "")
+    creatives = parse_creative_range(name)
+
+    # Get existing subtasks
+    existing_subs = {}
+    for st in task.get("subtasks", []):
+        sub_name = st.get("name", "")
+        sub_status = st.get("status", {}).get("status", "")
+        # Try to match subtask to a creative code
+        for code in creatives:
+            if f"[{code}]" in sub_name or sub_name.endswith(code):
+                existing_subs[code] = {"id": st["id"], "status": sub_status}
+                break
+
+    # Get RT performance data
+    perf_data = {}
+    try:
+        perf_data = get_performance_for_task(name, creatives)
+    except Exception:
+        pass
+
+    # Build creative list
+    creative_list = []
+    for code in creatives:
+        existing = existing_subs.get(code)
+        perf = perf_data.get(code)
+        creative_list.append({
+            "code": code,
+            "already_moved": existing is not None,
+            "existing_subtask_id": existing["id"] if existing else None,
+            "existing_status": existing["status"] if existing else None,
+            "performance": perf,
+        })
+
+    nicho = get_cf_value(task, CF_NICHO) or ""
+    return {
+        "task": {
+            "id": task["id"],
+            "name": name,
+            "status": task["status"]["status"],
+            "nicho": nicho.split(" - ")[0].strip(),
+            "oferta": get_cf_value(task, CF_OFERTA),
+            "fonte": get_cf_value(task, CF_FONTE),
+            "copywriter": get_cf_value(task, CF_COPYWRITER),
+            "editor": get_cf_value(task, CF_EDITOR),
+        },
+        "creatives": creative_list,
+        "total": len(creatives),
+        "moved": len(existing_subs),
+    }
+
+
+class MoveCreativeRequest(BaseModel):
+    creative_code: str
+    destination_status: str
+    gestor_nome: str
+
+
+@router.post("/tasks/{task_id}/move-creative")
+def move_creative(task_id: str, body: MoveCreativeRequest):
+    """Create a subtask for a specific creative in the chosen status."""
+    try:
+        task = get_task_detail(task_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    parent_name = task.get("name", "")
+    creatives = parse_creative_range(parent_name)
+
+    if body.creative_code not in creatives:
+        raise HTTPException(status_code=400, detail=f"Criativo '{body.creative_code}' nao faz parte do range")
+
+    # Check if already moved
+    for st in task.get("subtasks", []):
+        if f"[{body.creative_code}]" in st.get("name", ""):
+            raise HTTPException(status_code=409, detail=f"Criativo '{body.creative_code}' ja foi movido")
+
+    # Build subtask name
+    sub_name = build_subtask_name(parent_name, body.creative_code)
+
+    # Copy custom fields from parent
+    fields_to_copy = [CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES, CF_GESTOR_DROPDOWN]
+    custom_fields = []
+    for cf in task.get("custom_fields", []):
+        if cf["id"] in fields_to_copy and cf.get("value") is not None:
+            if cf.get("type") == "drop_down":
+                # For dropdowns, find the option ID from the orderindex value
+                opts = cf.get("type_config", {}).get("options", [])
+                val = cf["value"]
+                if isinstance(val, int) and val < len(opts):
+                    custom_fields.append({"id": cf["id"], "value": opts[val]["id"]})
+                else:
+                    custom_fields.append({"id": cf["id"], "value": val})
+            else:
+                custom_fields.append({"id": cf["id"], "value": cf["value"]})
+
+    # Get gestor ClickUp ID
+    gestor_key = body.gestor_nome.split()[0].lower() if body.gestor_nome else ""
+    gestor_cu_id = GESTOR_CLICKUP_MAP.get(gestor_key)
+
+    # Create subtask
+    sub_data = {
+        "name": sub_name,
+        "status": body.destination_status,
+        "parent": task_id,
+        "custom_fields": custom_fields,
+    }
+    if gestor_cu_id:
+        sub_data["assignees"] = [gestor_cu_id]
+
+    try:
+        result = clickup_post(f"/list/{CLICKUP_LIST_TRAFEGO}/task", sub_data)
+        return {
+            "status": "ok",
+            "subtask_id": result.get("id"),
+            "creative_code": body.creative_code,
+            "new_status": body.destination_status,
+            "subtask_name": sub_name,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
