@@ -22,7 +22,8 @@ ACTIVE_STATUSES = [
 
 
 def parse_creative_range(task_name: str) -> list:
-    """Parse [V122-V148] or [AD21-AD25] into individual codes."""
+    """Parse [V122-V148] or [AD21-AD25] into individual codes.
+    If no range found, returns ["_SINGLE"] to indicate the task itself is one creative."""
     results = []
     # Match ranges like [V122-V148], [V1-V20], [AD21-AD25], [AD21-25]
     for m in re.finditer(r'\[([A-Z]+)(\d+)-\1?(\d+)\]', task_name):
@@ -45,13 +46,21 @@ def parse_creative_range(task_name: str) -> list:
     if results:
         return results
 
-    # Single creative: [V123] or [AD21]
+    # Single creative in brackets: [V123] or [AD21]
     singles = re.findall(r'\[(V\d+|AD\d+)\](?!\[)', task_name)
-    return singles
+    if singles:
+        return singles
+
+    # No range found — the task itself is one creative (e.g. "[EM][OF02][FB] AD644")
+    # Return special marker so the UI can show the task as movable
+    return ["_SINGLE"]
 
 
 def build_subtask_name(parent_name: str, creative_code: str) -> str:
-    """Replace the range bracket with a single creative code."""
+    """Replace the range bracket with a single creative code.
+    If _SINGLE, return the parent name as-is (task moves directly, no subtask)."""
+    if creative_code == "_SINGLE":
+        return parent_name
     # Replace [V122-V148] or [AD21-AD25] with [V123] or [AD22]
     result = re.sub(r'\[[A-Z]+\d+-\d+\]', f'[{creative_code}]', parent_name, count=1)
     # Remove [V1] at end if it exists (it's a version marker for the batch, not the individual)
@@ -189,7 +198,9 @@ class MoveCreativeRequest(BaseModel):
 
 @router.post("/tasks/{task_id}/move-creative")
 def move_creative(task_id: str, body: MoveCreativeRequest):
-    """Create a subtask for a specific creative in the chosen status."""
+    """Move a creative: if _SINGLE, move the task itself. Otherwise create subtask."""
+    from app.services.clickup import update_task_status
+
     try:
         task = get_task_detail(task_id)
     except Exception as e:
@@ -200,6 +211,21 @@ def move_creative(task_id: str, body: MoveCreativeRequest):
 
     if body.creative_code not in creatives:
         raise HTTPException(status_code=400, detail=f"Criativo '{body.creative_code}' nao faz parte do range")
+
+    # SINGLE creative — move the task itself (no subtask needed)
+    if body.creative_code == "_SINGLE":
+        try:
+            update_task_status(task_id, body.destination_status)
+            return {
+                "status": "ok",
+                "subtask_id": None,
+                "creative_code": "_SINGLE",
+                "new_status": body.destination_status,
+                "subtask_name": parent_name,
+                "action": "moved_task",
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     # Check if already moved
     for st in task.get("subtasks", []):
@@ -215,7 +241,6 @@ def move_creative(task_id: str, body: MoveCreativeRequest):
     for cf in task.get("custom_fields", []):
         if cf["id"] in fields_to_copy and cf.get("value") is not None:
             if cf.get("type") == "drop_down":
-                # For dropdowns, find the option ID from the orderindex value
                 opts = cf.get("type_config", {}).get("options", [])
                 val = cf["value"]
                 if isinstance(val, int) and val < len(opts):
@@ -247,6 +272,7 @@ def move_creative(task_id: str, body: MoveCreativeRequest):
             "creative_code": body.creative_code,
             "new_status": body.destination_status,
             "subtask_name": sub_name,
+            "action": "created_subtask",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

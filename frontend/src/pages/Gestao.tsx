@@ -93,7 +93,7 @@ export default function Gestao({ gestor }: Props) {
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontFamily: "monospace", fontSize: 13, color: "#eceef2", fontWeight: 600 }}>{c.code}</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 13, color: "#eceef2", fontWeight: 600 }}>{c.code === "_SINGLE" ? creativeData.task.name : c.code}</span>
                       {c.already_moved && (
                         <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 999, background: STATUS_COLORS[c.existing_status] + "22", color: STATUS_COLORS[c.existing_status] || textTertiary }}>
                           {c.existing_status}
@@ -133,7 +133,7 @@ export default function Gestao({ gestor }: Props) {
           <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 24, width: 380, maxWidth: "90vw" }}>
             <p style={{ color: gold, fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Mover Criativo</p>
             <p style={{ color: textSecondary, fontSize: 13, marginBottom: 16 }}>
-              <strong style={{ color: "#eceef2" }}>{moveModal.code}</strong> sera criado como subtarefa no status selecionado.
+              <strong style={{ color: "#eceef2" }}>{moveModal.code === "_SINGLE" ? "Tarefa" : moveModal.code}</strong> sera {moveModal.code === "_SINGLE" ? "movida para o" : "criado como subtarefa no"} status selecionado.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
