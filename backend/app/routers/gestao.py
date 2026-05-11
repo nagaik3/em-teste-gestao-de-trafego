@@ -1,5 +1,6 @@
 """Gestao de Testes — endpoints para gerenciar criativos ativos."""
 import re
+import time
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -72,6 +73,11 @@ def build_subtask_name(parent_name: str, creative_code: str) -> str:
 def _task_summary(t):
     name = t.get("name", "")
     nicho = get_cf_value(t, CF_NICHO) or ""
+    date_created = int(t.get("date_created", "0"))
+    # has_alert: true if task has been in "em teste" for >7 days
+    days_since_created = (time.time() * 1000 - date_created) / (1000 * 60 * 60 * 24) if date_created else 0
+    status = t["status"]["status"]
+    has_alert = status == "em teste" and days_since_created > 7
     return {
         "id": t["id"],
         "name": name,
@@ -80,9 +86,10 @@ def _task_summary(t):
         "fonte": get_cf_value(t, CF_FONTE),
         "copywriter": get_cf_value(t, CF_COPYWRITER),
         "editor": get_cf_value(t, CF_EDITOR),
-        "status": t["status"]["status"],
+        "status": status,
         "creative_count": len(parse_creative_range(name)),
-        "date_created": int(t.get("date_created", "0")),
+        "date_created": date_created,
+        "has_alert": has_alert,
     }
 
 

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { gold, card, border, base, textSecondary, GESTORES } from "../styles/theme"
 import Atribuidor from "./Atribuidor"
 import Gestao from "./Gestao"
@@ -7,9 +7,22 @@ import NovaTarefa from "./NovaTarefa"
 type Tab = "atribuidor" | "gestao" | "nova-tarefa"
 type Gestor = typeof GESTORES[0]
 
+function loadGestor(): Gestor | null {
+  try {
+    const saved = localStorage.getItem("gestor_key")
+    if (saved) return GESTORES.find(g => g.key === saved) || null
+  } catch {}
+  return null
+}
+
 export default function App() {
-  const [gestor, setGestor] = useState<Gestor | null>(null)
+  const [gestor, setGestor] = useState<Gestor | null>(loadGestor)
   const [activeTab, setActiveTab] = useState<Tab>("gestao")
+
+  useEffect(() => {
+    if (gestor) localStorage.setItem("gestor_key", gestor.key)
+    else localStorage.removeItem("gestor_key")
+  }, [gestor])
 
   if (!gestor) {
     return (

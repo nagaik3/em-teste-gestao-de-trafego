@@ -18,6 +18,7 @@ export const STATUS_COLORS: Record<string, string> = {
   "pausado": "#8b90a0",
   "reprovado": "#555a6e",
   "aguardando teste": "#555a6e",
+  "cemitério": "#6b7280",
 }
 
 export const GESTORES = [

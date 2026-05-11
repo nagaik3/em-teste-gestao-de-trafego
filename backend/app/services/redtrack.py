@@ -1,5 +1,6 @@
 """RedTrack API service — fetch performance data and classify creatives."""
 import json
+import logging
 import os
 import re
 import time
@@ -7,6 +8,8 @@ import urllib.request
 import urllib.parse
 from datetime import date, timedelta
 from app.config import REDTRACK_API_KEY
+
+logger = logging.getLogger(__name__)
 
 _cache = {}
 _cache_ttl = 300  # 5 min
@@ -21,8 +24,12 @@ def fetch_rt_data(date_from: str, date_to: str) -> list:
         "per": "10000",
     })
     req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        logger.error(f"RedTrack API error: {e}")
+        return []
 
 
 def get_rt_data_cached() -> list:

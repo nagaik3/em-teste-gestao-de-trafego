@@ -107,11 +107,13 @@ def claim_task(task_id: str, body: ClaimRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    warnings = []
+
     if gestor_cu_id:
         try:
             add_task_assignee(task_id, gestor_cu_id)
-        except Exception:
-            pass
+        except Exception as e:
+            warnings.append(f"Falha ao adicionar assignee: {e}")
 
     try:
         task = get_task_detail(task_id)
@@ -124,7 +126,7 @@ def claim_task(task_id: str, body: ClaimRequest):
         else:
             data["notify_all"] = True
         clickup_post(f"/task/{task_id}/comment", data)
-    except Exception:
-        pass
+    except Exception as e:
+        warnings.append(f"Falha ao postar comentario: {e}")
 
-    return {"status": "ok", "task_id": task_id, "new_status": "em teste", "gestor": gestor_name}
+    return {"status": "ok", "task_id": task_id, "new_status": "em teste", "gestor": gestor_name, "warnings": warnings}
