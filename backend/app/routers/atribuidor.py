@@ -1,4 +1,5 @@
 """Atribuidor de Testes — endpoints."""
+import time
 from collections import defaultdict
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -29,6 +30,8 @@ def _detect_nicho(name):
 
 def _task_summary(t):
     name = t.get("name", "")
+    date_created = int(t.get("date_created", "0"))
+    days_waiting = int((time.time() * 1000 - date_created) / (1000 * 60 * 60 * 24)) if date_created else 0
     return {
         "id": t["id"], "name": name,
         "nicho": get_cf_value(t, CF_NICHO) or _detect_nicho(name),
@@ -38,7 +41,8 @@ def _task_summary(t):
         "copywriter": get_cf_value(t, CF_COPYWRITER),
         "editor": get_cf_value(t, CF_EDITOR),
         "mes": get_cf_value(t, CF_MES),
-        "date_created": int(t.get("date_created", "0")),
+        "date_created": date_created,
+        "days_waiting": days_waiting,
         "assignees": [{"id": a.get("id"), "username": a.get("username")} for a in t.get("assignees", [])],
     }
 

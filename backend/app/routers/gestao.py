@@ -23,50 +23,76 @@ ACTIVE_STATUSES = [
 
 
 def parse_creative_range(task_name: str) -> list:
-    """Parse [V122-V148] or [AD21-AD25] into individual codes.
-    If no range found, returns ["_SINGLE"] to indicate the task itself is one creative."""
-    results = []
-    # Match ranges like [V122-V148], [V1-V20], [AD21-AD25], [AD21-25]
-    for m in re.finditer(r'\[([A-Z]+)(\d+)-\1?(\d+)\]', task_name):
+    """Parse bracket ranges into individual codes, supporting cross-products.
+
+    Rules:
+    - A bracket with a dash between PREFIX+DIGITS is a **range**: [AD26-AD30], [V1-V2]
+    - A bracket without a dash (or with mixed content) is a **name prefix**: [AD09V2], [IMG 644 V9]
+    - Two consecutive ranges produce a cross-product: [AD26-AD30][V1-V2] → AD26V1..AD30V2
+    - One range alone expands normally: [V199-V224] → V199..V224
+    - No ranges → ["_SINGLE"]
+    """
+    # Find all ranges: brackets containing PREFIX+DIGITS+DASH+(optionalPREFIX)+DIGITS
+    # Allows optional spaces around dash: [AD185- AD189] or [AD185-AD189]
+    range_pattern = re.compile(r'\[([A-Z]+)(\d+)\s*-\s*\1?(\d+)\]')
+    ranges = []
+    for m in range_pattern.finditer(task_name):
         prefix = m.group(1)
         start = int(m.group(2))
         end = int(m.group(3))
-        for i in range(start, end + 1):
-            results.append(f"{prefix}{i}")
-    if results:
-        return results
+        items = [f"{prefix}{i}" for i in range(start, end + 1)]
+        ranges.append(items)
 
-    # Try implicit prefix: [V122-148]
-    for m in re.finditer(r'\[([A-Z]+)(\d+)-(\d+)\]', task_name):
-        prefix = m.group(1)
-        start = int(m.group(2))
-        end = int(m.group(3))
-        if end > start:
-            for i in range(start, end + 1):
-                results.append(f"{prefix}{i}")
-    if results:
-        return results
+    if len(ranges) == 2:
+        # Cross-product: [AD26-AD30][V1-V2] → AD26V1, AD26V2, ..., AD30V2
+        return [f"{a}{b}" for a in ranges[0] for b in ranges[1]]
+    elif len(ranges) == 1:
+        return ranges[0]
+    elif len(ranges) > 2:
+        # Unlikely but safe fallback: flatten all ranges
+        result = []
+        for r in ranges:
+            result.extend(r)
+        return result
 
-    # Single creative in brackets: [V123] or [AD21]
-    singles = re.findall(r'\[(V\d+|AD\d+)\](?!\[)', task_name)
-    if singles:
-        return singles
-
-    # No range found — the task itself is one creative (e.g. "[EM][OF02][FB] AD644")
-    # Return special marker so the UI can show the task as movable
+    # No range found — the task itself is one creative
     return ["_SINGLE"]
 
 
 def build_subtask_name(parent_name: str, creative_code: str) -> str:
-    """Replace the range bracket with a single creative code.
-    If _SINGLE, return the parent name as-is (task moves directly, no subtask)."""
+    """Replace range brackets with individual creative codes from the parsed result.
+    If _SINGLE, return the parent name as-is (task moves directly, no subtask).
+
+    For cross-product codes like AD26V1:
+    - Detect the two range brackets and split the code into AD-part and V-part
+    - Replace [AD26-AD30] with [AD26] and [V1-V2] with [V1]
+
+    For single-range codes like V199:
+    - Replace the one range bracket with [V199]
+    """
     if creative_code == "_SINGLE":
         return parent_name
-    # Replace ranges: [V199-V224], [V199-224], [AD21-AD25], [AD21-25]
-    # The prefix may or may not repeat before the second number
-    result = re.sub(r'\[[A-Z]+\d+-[A-Z]*\d+\]', f'[{creative_code}]', parent_name, count=1)
-    # Remove batch version marker [V1] or [V1-V2] at end (only low numbers = batch marker, not creative)
-    result = re.sub(r'\[V[12](?:-V?[12])?\]$', '', result)
+
+    range_pattern = re.compile(r'\[([A-Z]+)(\d+)\s*-\s*\1?(\d+)\]')
+    range_matches = list(range_pattern.finditer(parent_name))
+
+    if len(range_matches) == 2:
+        # Cross-product case: split creative_code into its two parts
+        # e.g., AD26V1 → AD26 + V1 based on the prefixes from the two ranges
+        prefix1 = range_matches[0].group(1)  # e.g., "AD"
+        prefix2 = range_matches[1].group(1)  # e.g., "V"
+        # Split: find where prefix2 starts in the creative code
+        split_match = re.match(rf'^({re.escape(prefix1)}\d+)({re.escape(prefix2)}\d+)$', creative_code)
+        if split_match:
+            part1 = split_match.group(1)  # e.g., AD26
+            part2 = split_match.group(2)  # e.g., V1
+            # Replace from right to left to preserve positions
+            result = parent_name[:range_matches[1].start()] + f'[{part2}]' + parent_name[range_matches[1].end():]
+            result = result[:range_matches[0].start()] + f'[{part1}]' + result[range_matches[0].end():]
+            return result
+
+    # Single range or fallback: replace the first range bracket
+    result = range_pattern.sub(f'[{creative_code}]', parent_name, count=1)
     return result
 
 
@@ -78,6 +104,7 @@ def _task_summary(t):
     days_since_created = (time.time() * 1000 - date_created) / (1000 * 60 * 60 * 24) if date_created else 0
     status = t["status"]["status"]
     has_alert = status == "em teste" and days_since_created > 7
+    days_in_status = int(days_since_created) if days_since_created else 0
     return {
         "id": t["id"],
         "name": name,
@@ -90,6 +117,7 @@ def _task_summary(t):
         "creative_count": len(parse_creative_range(name)),
         "date_created": date_created,
         "has_alert": has_alert,
+        "days_in_status": days_in_status,
     }
 
 

@@ -71,6 +71,9 @@ export default function Gestao({ gestor }: Props) {
                     <span style={{ fontSize: 11, color: textTertiary, fontFamily: "monospace" }}>
                       {t.moved_count > 0 ? `${t.moved_count}/` : ""}{t.creative_count > 0 ? t.creative_count : ""}
                     </span>
+                    <span style={{ fontSize: 10, fontFamily: "monospace", color: t.days_in_status > 7 ? "#f06060" : t.days_in_status >= 4 ? "#f0b840" : textTertiary, marginLeft: 2 }}>
+                      {t.days_in_status === 0 ? "hoje" : `${t.days_in_status}d`}
+                    </span>
                   </div>
                 </div>
                 {(t.fonte || t.copywriter) && (

@@ -4,7 +4,7 @@ import { gold, goldDim, card, border, surface, textSecondary, pill } from "../st
 
 const NICHOS = ["EM", "MM", "DB", "ED", "DA", "NE", "PT", "ZB", "ME"]
 
-function daysAgo(ts: number) { return Math.floor((Date.now() - ts) / 86400000) }
+function daysColor(d: number) { return d > 7 ? "#f06060" : d >= 4 ? "#f0b840" : "#555a6e" }
 
 interface Props { gestor: { nome: string; key: string } }
 
@@ -61,7 +61,7 @@ export default function Atribuidor({ gestor }: Props) {
             {isLoading ? "Carregando..." : `${tasks.length} tarefa${tasks.length !== 1 ? "s" : ""}`}
           </p>
           {tasks.map(t => {
-            const days = daysAgo(t.date_created)
+            const days = t.days_waiting ?? Math.floor((Date.now() - t.date_created) / 86400000)
             const sel = selectedId === t.id
             return <button key={t.id} onClick={() => setSelectedId(t.id)} style={{
               display: "block", width: "100%", textAlign: "left", background: sel ? "#1e222e" : card, border: `1px solid ${sel ? gold : border}`,
@@ -69,7 +69,7 @@ export default function Atribuidor({ gestor }: Props) {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontFamily: "monospace", fontSize: 13, color: "#eceef2", wordBreak: "break-all" }}>{t.name}</span>
-                <span style={{ fontSize: 12, fontFamily: "monospace", color: days >= 7 ? "#f06060" : days >= 3 ? "#f0b840" : "#555a6e", whiteSpace: "nowrap", marginLeft: 12 }}>{days === 0 ? "hoje" : `${days}d`}</span>
+                <span style={{ fontSize: 10, fontFamily: "monospace", color: daysColor(days), whiteSpace: "nowrap", marginLeft: 12 }}>{days === 0 ? "hoje" : `${days}d`}</span>
               </div>
               <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {t.fonte && <span style={{ background: "rgba(91,141,239,0.12)", color: "#5b8def", padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600 }}>{(t.fonte).split(" - ")[0]}</span>}

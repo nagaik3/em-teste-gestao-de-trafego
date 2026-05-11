@@ -3,7 +3,7 @@ import { apiGet, apiPost } from "./client"
 
 // Types
 interface CountItem { nicho: string; regiao: string; count: number }
-interface Task { id: string; name: string; nicho: string; regiao: string; oferta: string | null; fonte: string | null; copywriter: string | null; editor: string | null; mes: string | null; date_created: number }
+interface Task { id: string; name: string; nicho: string; regiao: string; oferta: string | null; fonte: string | null; copywriter: string | null; editor: string | null; mes: string | null; date_created: number; days_waiting?: number }
 interface TaskDetail extends Task { description: string; status: string; checklists: { name: string; items: { name: string; resolved: boolean }[] }[] }
 
 // Atribuidor
