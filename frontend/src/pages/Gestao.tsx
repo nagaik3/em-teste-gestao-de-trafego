@@ -28,7 +28,7 @@ export default function Gestao({ gestor }: Props) {
           setMoveModal(null); setDestStatus(""); setMoveError("")
           refetchCreatives()
           if (res?.parent_action) {
-            const newStatus = res.parent_action.replace("parent_moved_to_", "")
+            const newStatus = res.parent_action === "teste_concluido" ? "Teste Concluído" : res.parent_action.replace("parent_moved_to_", "")
             setParentMoved(newStatus)
             refetchTasks()
             setTimeout(() => { setParentMoved(""); setSelectedTaskId(null) }, 3000)

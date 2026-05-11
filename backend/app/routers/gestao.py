@@ -280,32 +280,54 @@ def move_creative(task_id: str, body: MoveCreativeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Check if ALL creatives have been moved — if so, resolve the parent task
+    # Check if ALL creatives have been moved — if so, move parent to "teste concluido"
     parent_action = None
     try:
-        # Re-fetch task to get updated subtasks
+        from app.services.clickup import clickup_post as _post
         updated_task = get_task_detail(task_id)
-        moved_count = 0
+        moved_subs = []
         for st in updated_task.get("subtasks", []):
             st_status = st.get("status", {}).get("status", "")
             if st_status not in ("aguardando teste", "em teste"):
-                moved_count += 1
-        if moved_count >= len(creatives):
-            # All creatives moved — determine dominant status for parent
-            sub_statuses = []
-            for st in updated_task.get("subtasks", []):
-                st_status = st.get("status", {}).get("status", "")
-                if st_status not in ("aguardando teste", "em teste"):
-                    sub_statuses.append(st_status)
-            # Priority: escala > validado > pré-escala > em risco > negativo > cemitério > pausado
-            STATUS_PRIORITY = ["escala", "validado", "pré-escala", "em risco", "negativo", "cemitério", "pausado"]
-            best = "cemitério"
-            for sp in STATUS_PRIORITY:
-                if sp in sub_statuses:
-                    best = sp
-                    break
-            update_task_status(task_id, best)
-            parent_action = f"parent_moved_to_{best}"
+                moved_subs.append({"name": st.get("name", ""), "status": st_status})
+
+        if len(moved_subs) >= len(creatives):
+            # All creatives moved — build test summary and move parent
+            date_created = int(updated_task.get("date_created", "0"))
+            now_ms = int(time.time() * 1000)
+            days = round((now_ms - date_created) / (1000 * 60 * 60 * 24)) if date_created else 0
+            from datetime import datetime
+            start_date = datetime.fromtimestamp(date_created / 1000).strftime("%d/%m/%Y") if date_created else "?"
+            end_date = datetime.now().strftime("%d/%m/%Y")
+
+            # Count results
+            positivos = sum(1 for s in moved_subs if s["status"] in ("pré-escala", "validado", "escala"))
+            total = len(moved_subs)
+
+            # Build summary comment
+            lines = [
+                f"══ TESTE CONCLUÍDO ══",
+                f"Início: {start_date}",
+                f"Conclusão: {end_date}",
+                f"Duração: {days} dias",
+                f"",
+                f"Resultado ({positivos}/{total} positivos — {round(positivos/total*100)}%):",
+            ]
+            for s in moved_subs:
+                lines.append(f"  {s['name'].split(']')[-1] if ']' in s['name'] else s['name']} → {s['status']}")
+
+            comment_text = "\n".join(lines)
+
+            # Move parent to "teste concluido"
+            update_task_status(task_id, "teste concluido")
+
+            # Post summary as comment
+            try:
+                _post(f"/task/{task_id}/comment", {"comment_text": comment_text})
+            except Exception:
+                pass
+
+            parent_action = "teste_concluido"
     except Exception:
         pass  # Non-critical — parent stays in "em teste" if this fails
 
