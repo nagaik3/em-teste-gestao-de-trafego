@@ -280,7 +280,7 @@ def move_creative(task_id: str, body: MoveCreativeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Check if ALL creatives have been moved — if so, move parent to "teste concluido"
+    # Check if ALL creatives have been moved — if so, move parent to "testes concluídos"
     parent_action = None
     try:
         from app.services.clickup import clickup_post as _post
@@ -318,8 +318,8 @@ def move_creative(task_id: str, body: MoveCreativeRequest):
 
             comment_text = "\n".join(lines)
 
-            # Move parent to "teste concluido"
-            update_task_status(task_id, "teste concluido")
+            # Move parent to "testes concluídos"
+            update_task_status(task_id, "testes concluídos")
 
             # Post summary as comment
             try:
