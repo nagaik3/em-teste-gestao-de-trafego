@@ -10,6 +10,7 @@ export default function Gestao({ gestor }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [moveModal, setMoveModal] = useState<{ code: string; suggestion?: string } | null>(null)
   const [destStatus, setDestStatus] = useState("")
+  const [moveError, setMoveError] = useState("")
 
   const { data, isLoading } = useGestaoTasks(gestor.key)
   const { data: creativeData, refetch: refetchCreatives } = useTaskCreatives(selectedTaskId, gestor.key)
@@ -17,9 +18,13 @@ export default function Gestao({ gestor }: Props) {
 
   function handleMove() {
     if (!selectedTaskId || !moveModal || !destStatus) return
+    setMoveError("")
     moveMutation.mutate(
       { taskId: selectedTaskId, creativeCode: moveModal.code, destinationStatus: destStatus, gestorNome: gestor.nome },
-      { onSuccess: () => { setMoveModal(null); setDestStatus(""); refetchCreatives() } },
+      {
+        onSuccess: () => { setMoveModal(null); setDestStatus(""); setMoveError(""); refetchCreatives() },
+        onError: (err: any) => { setMoveError(err?.message || "Erro ao mover criativo. Tente novamente.") },
+      },
     )
   }
 
@@ -153,8 +158,10 @@ export default function Gestao({ gestor }: Props) {
               ))}
             </div>
 
+            {moveError && <p style={{ color: "#f06060", fontSize: 12, marginBottom: 12, padding: "8px 12px", background: "rgba(240,96,96,0.1)", borderRadius: 6 }}>{moveError}</p>}
+
             <div style={{ display: "flex", gap: 12 }}>
-              <button onClick={() => { setMoveModal(null); setDestStatus("") }} disabled={moveMutation.isPending}
+              <button onClick={() => { setMoveModal(null); setDestStatus(""); setMoveError("") }} disabled={moveMutation.isPending}
                 style={{ flex: 1, padding: 10, background: "#181b24", border: `1px solid ${border}`, borderRadius: 8, color: textSecondary, fontSize: 13, cursor: "pointer" }}>
                 Cancelar
               </button>

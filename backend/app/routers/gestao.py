@@ -61,10 +61,11 @@ def build_subtask_name(parent_name: str, creative_code: str) -> str:
     If _SINGLE, return the parent name as-is (task moves directly, no subtask)."""
     if creative_code == "_SINGLE":
         return parent_name
-    # Replace [V122-V148] or [AD21-AD25] with [V123] or [AD22]
-    result = re.sub(r'\[[A-Z]+\d+-\d+\]', f'[{creative_code}]', parent_name, count=1)
-    # Remove [V1] at end if it exists (it's a version marker for the batch, not the individual)
-    result = re.sub(r'\[V1\]$', '', result)
+    # Replace ranges: [V199-V224], [V199-224], [AD21-AD25], [AD21-25]
+    # The prefix may or may not repeat before the second number
+    result = re.sub(r'\[[A-Z]+\d+-[A-Z]*\d+\]', f'[{creative_code}]', parent_name, count=1)
+    # Remove batch version marker [V1] or [V1-V2] at end (only low numbers = batch marker, not creative)
+    result = re.sub(r'\[V[12](?:-V?[12])?\]$', '', result)
     return result
 
 
