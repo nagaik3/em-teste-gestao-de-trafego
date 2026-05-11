@@ -2,8 +2,9 @@
 import re
 import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
+from app.auth import get_current_user
 from app.config import (
     CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP,
     CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES, CF_GESTOR_DROPDOWN,
@@ -122,8 +123,14 @@ def _task_summary(t):
 
 
 @router.get("/tasks")
-def list_tasks(gestor: str = Query(...)):
+def list_tasks(request: Request, gestor: str = Query(...)):
     """Get all active tasks for a gestor, grouped by status."""
+    user = get_current_user(request)
+
+    # Gestor role: force their own gestor_key
+    if user["role"] == "gestor":
+        gestor = user.get("gestor_key") or gestor
+
     gestor_cu_id = GESTOR_CLICKUP_MAP.get(gestor.lower())
     if not gestor_cu_id:
         raise HTTPException(status_code=400, detail=f"Gestor '{gestor}' nao encontrado")
@@ -167,8 +174,14 @@ def list_tasks(gestor: str = Query(...)):
 
 
 @router.get("/tasks/{task_id}/creatives")
-def task_creatives(task_id: str, gestor: str = Query(...)):
+def task_creatives(request: Request, task_id: str, gestor: str = Query(...)):
     """Expand a task into individual creatives with performance data."""
+    user = get_current_user(request)
+
+    # Gestor role: force their own gestor_key
+    if user["role"] == "gestor":
+        gestor = user.get("gestor_key") or gestor
+
     try:
         task = get_task_detail(task_id)
     except Exception as e:
@@ -236,8 +249,18 @@ class MoveCreativeRequest(BaseModel):
 
 
 @router.post("/tasks/{task_id}/move-creative")
-def move_creative(task_id: str, body: MoveCreativeRequest):
+def move_creative(request: Request, task_id: str, body: MoveCreativeRequest):
     """Move a creative: if _SINGLE, move the task itself. Otherwise create subtask."""
+    user = get_current_user(request)
+
+    # Block visitante from writing
+    if user["role"] == "visitante":
+        raise HTTPException(status_code=403, detail="Visitantes nao podem mover criativos")
+
+    # For gestor, force gestor_nome from JWT
+    if user["role"] == "gestor":
+        body.gestor_nome = user["nome"]
+
     from app.services.clickup import update_task_status
 
     try:

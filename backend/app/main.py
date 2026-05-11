@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from app.auth import router as auth_router
 from app.routers.atribuidor import router as atribuidor_router
 from app.routers.gestao import router as gestao_router
 from app.routers.nova_tarefa import router as nova_tarefa_router
@@ -18,6 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Auth router MUST come before other routers and SPA catch-all
+app.include_router(auth_router)
 app.include_router(atribuidor_router)
 app.include_router(gestao_router)
 app.include_router(nova_tarefa_router)

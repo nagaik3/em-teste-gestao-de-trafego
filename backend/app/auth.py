@@ -1,17 +1,23 @@
+from __future__ import annotations
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel
+from typing import Optional
 from app.config import JWT_SECRET, JWT_ALGORITHM, JWT_ACCESS_EXPIRE_MINUTES, USERS
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def create_token(email: str, nome: str, role: str) -> str:
+def create_token(email: str, nome: str, role: str, gestor_key: Optional[str]) -> str:
     expire = datetime.utcnow() + timedelta(minutes=JWT_ACCESS_EXPIRE_MINUTES)
-    return jwt.encode({"sub": email, "nome": nome, "role": role, "exp": expire}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(
+        {"sub": email, "nome": nome, "role": role, "gestor_key": gestor_key, "exp": expire},
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
 
 
 def get_current_user(request: Request) -> dict:
@@ -28,6 +34,16 @@ def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Token invalido")
 
 
+def require_role(*allowed_roles):
+    """FastAPI dependency that checks if current user has one of the allowed roles."""
+    def _dependency(request: Request) -> dict:
+        user = get_current_user(request)
+        if user["role"] not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Acesso negado para este perfil")
+        return user
+    return Depends(_dependency)
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -36,17 +52,27 @@ class LoginRequest(BaseModel):
 @router.post("/login")
 def login(body: LoginRequest, response: Response):
     user = USERS.get(body.email)
-    if not user or user["password"] != body.password:
+    if not user or not pwd_context.verify(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Credenciais invalidas")
-    token = create_token(body.email, user["nome"], user["role"])
-    response.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=86400)
-    return {"email": body.email, "nome": user["nome"], "role": user["role"]}
+    token = create_token(body.email, user["nome"], user["role"], user["gestor_key"])
+    response.set_cookie("access_token", token, httponly=True, samesite="lax", secure=False, max_age=86400)
+    return {
+        "email": body.email,
+        "nome": user["nome"],
+        "role": user["role"],
+        "gestor_key": user["gestor_key"],
+    }
 
 
 @router.get("/me")
 def me(request: Request):
     user = get_current_user(request)
-    return {"email": user["sub"], "nome": user["nome"], "role": user["role"]}
+    return {
+        "email": user["sub"],
+        "nome": user["nome"],
+        "role": user["role"],
+        "gestor_key": user.get("gestor_key"),
+    }
 
 
 @router.post("/logout")

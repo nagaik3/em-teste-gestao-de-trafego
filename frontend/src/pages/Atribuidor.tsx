@@ -6,9 +6,9 @@ const NICHOS = ["EM", "MM", "DB", "ED", "DA", "NE", "PT", "ZB", "ME"]
 
 function daysColor(d: number) { return d > 7 ? "#f06060" : d >= 4 ? "#f0b840" : "#555a6e" }
 
-interface Props { gestor: { nome: string; key: string } }
+interface Props { gestor: { nome: string; key: string }; role: string }
 
-export default function Atribuidor({ gestor }: Props) {
+export default function Atribuidor({ gestor, role }: Props) {
   const [nicho, setNicho] = useState<string | null>(null)
   const [regiao, setRegiao] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -18,6 +18,8 @@ export default function Atribuidor({ gestor }: Props) {
   const { data: tasks = [], isLoading, refetch } = useTasks(nicho, regiao)
   const { data: detail } = useTaskDetail(selectedId)
   const claim = useClaim()
+
+  const canWrite = role !== "visitante"
 
   function getCount(n: string, r?: string) { return counts.filter(c => c.nicho === n && (!r || c.regiao === r)).reduce((s, c) => s + c.count, 0) }
 
@@ -113,7 +115,9 @@ export default function Atribuidor({ gestor }: Props) {
               <div style={{ width: 32, height: 32, borderRadius: "50%", background: gold, display: "flex", alignItems: "center", justifyContent: "center", color: "#08090c", fontWeight: 700, fontSize: 14 }}>{gestor.nome.charAt(0)}</div>
               <div><p style={{ color: textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>Gestor responsavel</p><p style={{ color: "#eceef2", fontSize: 14, fontWeight: 500 }}>{gestor.nome}</p></div>
             </div>
-            <button onClick={() => setShowConfirm(true)} style={{ width: "100%", padding: 14, background: gold, color: "#08090c", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Iniciar Teste</button>
+            {canWrite && (
+              <button onClick={() => setShowConfirm(true)} style={{ width: "100%", padding: 14, background: gold, color: "#08090c", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Iniciar Teste</button>
+            )}
           </div>
         </div>
       )}

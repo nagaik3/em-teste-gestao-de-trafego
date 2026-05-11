@@ -1,6 +1,7 @@
 """Performance — summary alerts from RedTrack."""
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from app.auth import get_current_user
 from app.config import CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP
 from app.services.clickup import get_list_tasks, get_cf_value
 from app.services.redtrack import get_performance_for_task
@@ -10,7 +11,13 @@ router = APIRouter(prefix="/api/performance", tags=["performance"])
 
 
 @router.get("/summary")
-def performance_summary(gestor: str = Query(...)):
+def performance_summary(request: Request, gestor: str = Query(...)):
+    user = get_current_user(request)
+
+    # Gestor role: force their own gestor_key
+    if user["role"] == "gestor":
+        gestor = user.get("gestor_key") or gestor
+
     gestor_cu_id = GESTOR_CLICKUP_MAP.get(gestor.lower())
     if not gestor_cu_id:
         raise HTTPException(status_code=400, detail="Gestor nao encontrado")

@@ -6,6 +6,13 @@ class ApiError extends Error {
 }
 
 async function handle<T>(r: Response): Promise<T> {
+  if (r.status === 401) {
+    // Don't redirect if already on login page or if this is the /auth/me check
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login"
+    }
+    throw new ApiError("Sessao expirada", 401)
+  }
   if (!r.ok) {
     let msg = ""
     try {

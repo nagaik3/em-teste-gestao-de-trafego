@@ -2,9 +2,9 @@ import { useState } from "react"
 import { useFormOptions, useCreateTask } from "../api/hooks"
 import { gold, card, border, textSecondary, textTertiary, pill } from "../styles/theme"
 
-interface Props { gestor: { nome: string; key: string } }
+interface Props { gestor: { nome: string; key: string }; role: string }
 
-export default function NovaTarefa({ gestor }: Props) {
+export default function NovaTarefa({ gestor, role }: Props) {
   const [nicho, setNicho] = useState("")
   const [regiao, setRegiao] = useState("BR")
   const [oferta, setOferta] = useState("")
@@ -17,10 +17,22 @@ export default function NovaTarefa({ gestor }: Props) {
   const { data: options } = useFormOptions()
   const createMutation = useCreateTask()
 
+  // Visitante should never reach here (tab hidden), but guard anyway
+  if (role === "visitante") {
+    return (
+      <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 40, textAlign: "center" }}>
+        <p style={{ color: textSecondary, fontSize: 15, marginBottom: 8 }}>Acesso restrito</p>
+        <p style={{ color: textTertiary, fontSize: 13 }}>Visitantes nao podem criar tarefas.</p>
+      </div>
+    )
+  }
+
+  const isGestor = role === "gestor"
+
   function handleCreate() {
     if (!nicho || !oferta || !fonte || !creativeName) return
     createMutation.mutate(
-      { nicho, regiao, oferta, fonte, creative_name: creativeName, material_link: link, gestor_key: gestorKey },
+      { nicho, regiao, oferta, fonte, creative_name: creativeName, material_link: link, gestor_key: isGestor ? gestor.key : gestorKey },
       { onSuccess: (data: any) => { setSuccess(data.task_name); setCreativeName(""); setLink("") } },
     )
   }
@@ -107,9 +119,15 @@ export default function NovaTarefa({ gestor }: Props) {
         {/* Gestor */}
         <div style={{ marginBottom: 20 }}>
           <label style={labelStyle}>Gestor que subiu</label>
-          <select value={gestorKey} onChange={e => setGestorKey(e.target.value)} style={selectStyle}>
-            {(options?.gestores || []).map((g: any) => <option key={g.key} value={g.key}>{g.nome}</option>)}
-          </select>
+          {isGestor ? (
+            <div style={{ ...inputStyle, background: "rgba(212,168,71,0.08)", borderColor: gold + "44", display: "flex", alignItems: "center" }}>
+              {gestor.nome}
+            </div>
+          ) : (
+            <select value={gestorKey} onChange={e => setGestorKey(e.target.value)} style={selectStyle}>
+              {(options?.gestores || []).map((g: any) => <option key={g.key} value={g.key}>{g.nome}</option>)}
+            </select>
+          )}
         </div>
 
         {/* Preview */}

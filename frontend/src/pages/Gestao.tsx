@@ -2,11 +2,11 @@ import { useState } from "react"
 import { useGestaoTasks, useTaskCreatives, useMoveCreative } from "../api/hooks"
 import { gold, goldDim, card, border, surface, textSecondary, textTertiary, STATUS_COLORS } from "../styles/theme"
 
-interface Props { gestor: { nome: string; key: string } }
+interface Props { gestor: { nome: string; key: string }; role: string }
 
 const DEST_STATUSES = ["pré-escala", "validado", "escala", "em risco", "negativo", "cemitério", "pausado"]
 
-export default function Gestao({ gestor }: Props) {
+export default function Gestao({ gestor, role }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [moveModal, setMoveModal] = useState<{ code: string; suggestion?: string } | null>(null)
   const [destStatus, setDestStatus] = useState("")
@@ -16,6 +16,8 @@ export default function Gestao({ gestor }: Props) {
   const { data: creativeData, refetch: refetchCreatives } = useTaskCreatives(selectedTaskId, gestor.key)
   const moveMutation = useMoveCreative()
   const [parentMoved, setParentMoved] = useState("")
+
+  const canWrite = role !== "visitante"
 
   function handleMove() {
     if (!selectedTaskId || !moveModal || !destStatus) return
@@ -131,7 +133,7 @@ export default function Gestao({ gestor }: Props) {
                         </span>
                       )}
                     </div>
-                    {!c.already_moved && (
+                    {!c.already_moved && canWrite && (
                       <button onClick={() => { setMoveModal({ code: c.code, suggestion: perf?.suggestion }); setDestStatus(perf?.suggestion || "") }}
                         style={{ background: gold, color: "#08090c", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                         Mover

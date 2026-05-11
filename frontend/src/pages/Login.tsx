@@ -26,7 +26,7 @@ export default function Login() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#08090c" }}>
       <form onSubmit={handleSubmit} style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 32, width: 360 }}>
         <h1 style={{ color: gold, fontSize: 20, fontWeight: 700, marginBottom: 4 }}>IMPERA</h1>
-        <p style={{ color: "#8b90a0", fontSize: 13, marginBottom: 24 }}>Atribuidor de Testes</p>
+        <p style={{ color: "#8b90a0", fontSize: 13, marginBottom: 24 }}>Gestao de Testes</p>
         {error && <p style={{ color: "#f06060", fontSize: 13, marginBottom: 12 }}>{error}</p>}
         <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required
           style={{ width: "100%", padding: "10px 12px", marginBottom: 12, background: "transparent", border: `1px solid ${border}`, borderRadius: 8, color: "#eceef2", fontSize: 14, boxSizing: "border-box" }} />

@@ -1,6 +1,7 @@
 """Nova Tarefa — criar tarefas de ripagem/direto."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+from app.auth import get_current_user
 from app.config import (
     CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP,
     CF_NICHO, CF_FONTE, CF_OFERTA, CF_GESTOR_DROPDOWN,
@@ -56,7 +57,8 @@ GESTOR_DROPDOWN_OPTIONS = {
 
 
 @router.get("/options")
-def get_options():
+def get_options(request: Request):
+    user = get_current_user(request)
     return {
         "nichos": [{"code": n["code"], "label": n["label"]} for n in NICHOS],
         "regioes": [{"code": "BR", "label": "Brasil"}, {"code": "EUA", "label": "EUA"}],
@@ -77,7 +79,13 @@ class CreateTaskRequest(BaseModel):
 
 
 @router.post("/create")
-def create_task(body: CreateTaskRequest):
+def create_task(request: Request, body: CreateTaskRequest):
+    user = get_current_user(request)
+
+    # Block visitante from creating tasks
+    if user["role"] == "visitante":
+        raise HTTPException(status_code=403, detail="Visitantes nao podem criar tarefas")
+
     # Build task name
     regiao_part = f"[{body.regiao}]" if body.regiao == "EUA" else "[BR]"
     name = f"[{body.nicho}]{regiao_part}[{body.oferta}][{body.fonte}][{body.creative_name}]"
