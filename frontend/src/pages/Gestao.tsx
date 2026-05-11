@@ -12,17 +12,28 @@ export default function Gestao({ gestor }: Props) {
   const [destStatus, setDestStatus] = useState("")
   const [moveError, setMoveError] = useState("")
 
-  const { data, isLoading } = useGestaoTasks(gestor.key)
+  const { data, isLoading, refetch: refetchTasks } = useGestaoTasks(gestor.key)
   const { data: creativeData, refetch: refetchCreatives } = useTaskCreatives(selectedTaskId, gestor.key)
   const moveMutation = useMoveCreative()
+  const [parentMoved, setParentMoved] = useState("")
 
   function handleMove() {
     if (!selectedTaskId || !moveModal || !destStatus) return
     setMoveError("")
+    setParentMoved("")
     moveMutation.mutate(
       { taskId: selectedTaskId, creativeCode: moveModal.code, destinationStatus: destStatus, gestorNome: gestor.nome },
       {
-        onSuccess: () => { setMoveModal(null); setDestStatus(""); setMoveError(""); refetchCreatives() },
+        onSuccess: (res: any) => {
+          setMoveModal(null); setDestStatus(""); setMoveError("")
+          refetchCreatives()
+          if (res?.parent_action) {
+            const newStatus = res.parent_action.replace("parent_moved_to_", "")
+            setParentMoved(newStatus)
+            refetchTasks()
+            setTimeout(() => { setParentMoved(""); setSelectedTaskId(null) }, 3000)
+          }
+        },
         onError: (err: any) => { setMoveError(err?.message || "Erro ao mover criativo. Tente novamente.") },
       },
     )
@@ -73,6 +84,13 @@ export default function Gestao({ gestor }: Props) {
           })}
         </div>
       ))}
+
+      {/* Parent moved notification */}
+      {parentMoved && (
+        <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 70, background: "#1a2e1a", border: "1px solid #2dd4a0", borderRadius: 10, padding: "12px 24px", color: "#2dd4a0", fontSize: 13, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.6)" }}>
+          Todos os criativos movidos — tarefa pai movida para <span style={{ textTransform: "capitalize" }}>{parentMoved}</span>
+        </div>
+      )}
 
       {/* Creative detail panel */}
       {selectedTaskId && creativeData && !moveModal && (

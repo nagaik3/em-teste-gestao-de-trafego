@@ -149,11 +149,14 @@ def task_creatives(task_id: str, gestor: str = Query(...)):
     name = task.get("name", "")
     creatives = parse_creative_range(name)
 
-    # Get existing subtasks
+    # Get existing subtasks — ignore legacy statuses (aguardando teste, em teste)
+    LEGACY_STATUSES = {"aguardando teste", "em teste"}
     existing_subs = {}
     for st in task.get("subtasks", []):
         sub_name = st.get("name", "")
         sub_status = st.get("status", {}).get("status", "")
+        if sub_status in LEGACY_STATUSES:
+            continue  # Skip legacy subtasks from old expandir_subtarefas system
         # Try to match subtask to a creative code
         for code in creatives:
             if f"[{code}]" in sub_name or sub_name.endswith(code):
@@ -274,13 +277,44 @@ def move_creative(task_id: str, body: MoveCreativeRequest):
 
     try:
         result = clickup_post(f"/list/{CLICKUP_LIST_TRAFEGO}/task", sub_data)
-        return {
-            "status": "ok",
-            "subtask_id": result.get("id"),
-            "creative_code": body.creative_code,
-            "new_status": body.destination_status,
-            "subtask_name": sub_name,
-            "action": "created_subtask",
-        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    # Check if ALL creatives have been moved — if so, resolve the parent task
+    parent_action = None
+    try:
+        # Re-fetch task to get updated subtasks
+        updated_task = get_task_detail(task_id)
+        moved_count = 0
+        for st in updated_task.get("subtasks", []):
+            st_status = st.get("status", {}).get("status", "")
+            if st_status not in ("aguardando teste", "em teste"):
+                moved_count += 1
+        if moved_count >= len(creatives):
+            # All creatives moved — determine dominant status for parent
+            sub_statuses = []
+            for st in updated_task.get("subtasks", []):
+                st_status = st.get("status", {}).get("status", "")
+                if st_status not in ("aguardando teste", "em teste"):
+                    sub_statuses.append(st_status)
+            # Priority: escala > validado > pré-escala > em risco > negativo > cemitério > pausado
+            STATUS_PRIORITY = ["escala", "validado", "pré-escala", "em risco", "negativo", "cemitério", "pausado"]
+            best = "cemitério"
+            for sp in STATUS_PRIORITY:
+                if sp in sub_statuses:
+                    best = sp
+                    break
+            update_task_status(task_id, best)
+            parent_action = f"parent_moved_to_{best}"
+    except Exception:
+        pass  # Non-critical — parent stays in "em teste" if this fails
+
+    return {
+        "status": "ok",
+        "subtask_id": result.get("id"),
+        "creative_code": body.creative_code,
+        "new_status": body.destination_status,
+        "subtask_name": sub_name,
+        "action": "created_subtask",
+        "parent_action": parent_action,
+    }
