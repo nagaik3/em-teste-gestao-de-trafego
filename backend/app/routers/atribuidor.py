@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from app.auth import get_current_user
+from app.security import audit_log
 from app.config import (
     CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP, COPYWRITER_USER_MAP,
     CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES,
@@ -147,5 +148,8 @@ def claim_task(request: Request, task_id: str, body: ClaimRequest):
         clickup_post(f"/task/{task_id}/comment", data)
     except Exception as e:
         warnings.append(f"Falha ao postar comentario: {e}")
+
+    ip = request.client.host if request.client else "unknown"
+    audit_log(user["sub"], "claim_task", f"task {task_id} claimed", ip)
 
     return {"status": "ok", "task_id": task_id, "new_status": "em teste", "gestor": gestor_name, "warnings": warnings}

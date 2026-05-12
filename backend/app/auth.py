@@ -7,8 +7,9 @@ from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel
 from typing import Optional
 from app.config import JWT_SECRET, JWT_ALGORITHM
-from app.database import get_user_by_email
+from app.database import get_user_by_email, SessionLocal, User
 from app.security import check_rate_limit, clear_rate_limit, audit_log
+from app.password_policy import validate_password
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -147,3 +148,43 @@ def logout(response: Response, request: Request):
         pass
     response.delete_cookie("refresh_token", path="/auth")
     return {"ok": True}
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+def change_password(body: ChangePasswordRequest, request: Request):
+    user = get_current_user(request)
+    email = user["sub"]
+    ip = request.client.host if request.client else "unknown"
+
+    if not SessionLocal:
+        raise HTTPException(status_code=500, detail="Database nao configurado")
+
+    db = SessionLocal()
+    try:
+        db_user = db.query(User).filter(User.email == email).first()
+        if not db_user:
+            raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+        if not pwd_context.verify(body.current_password, db_user.password_hash):
+            audit_log(email, "change_password_failed", "Senha atual incorreta", ip)
+            raise HTTPException(status_code=401, detail="Senha atual incorreta")
+
+        validate_password(body.new_password)
+
+        db_user.password_hash = pwd_context.hash(body.new_password)
+        db.commit()
+
+        audit_log(email, "change_password", "Senha alterada com sucesso", ip)
+        return {"ok": True, "message": "Senha alterada com sucesso"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

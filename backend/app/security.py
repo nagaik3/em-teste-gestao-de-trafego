@@ -59,23 +59,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# --- Audit Logger ---
-_audit_log = []  # In-memory for now, could be file/DB later
+# --- Audit Logger (PostgreSQL-backed) ---
+from app.database import log_audit as _db_log_audit, get_audit_logs as _db_get_audit_logs
 
 
-def audit_log(user_email: str, action: str, details: str = ""):
-    """Log a security-relevant action."""
-    entry = {
-        "ts": time.time(),
-        "user": user_email,
-        "action": action,
-        "details": details[:500],
-    }
-    _audit_log.append(entry)
-    # Keep last 1000 entries in memory
-    if len(_audit_log) > 1000:
-        _audit_log.pop(0)
+def audit_log(user_email: str, action: str, details: str = "", ip: str = ""):
+    """Log a security-relevant action to PostgreSQL."""
+    _db_log_audit(user_email, action, details, ip)
 
 
 def get_audit_log(limit: int = 50):
-    return list(reversed(_audit_log[-limit:]))
+    return _db_get_audit_logs(limit)

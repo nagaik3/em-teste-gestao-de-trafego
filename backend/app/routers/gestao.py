@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from app.auth import get_current_user
+from app.security import audit_log
 from app.config import (
     CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP,
     CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES, CF_GESTOR_DROPDOWN,
@@ -274,10 +275,13 @@ def move_creative(request: Request, task_id: str, body: MoveCreativeRequest):
     if body.creative_code not in creatives:
         raise HTTPException(status_code=400, detail=f"Criativo '{body.creative_code}' nao faz parte do range")
 
+    ip = request.client.host if request.client else "unknown"
+
     # SINGLE creative — move the task itself (no subtask needed)
     if body.creative_code == "_SINGLE":
         try:
             update_task_status(task_id, body.destination_status)
+            audit_log(user["sub"], "move_creative", f"_SINGLE → {body.destination_status} (task {task_id})", ip)
             return {
                 "status": "ok",
                 "subtask_id": None,
@@ -330,6 +334,8 @@ def move_creative(request: Request, task_id: str, body: MoveCreativeRequest):
         result = clickup_post(f"/list/{CLICKUP_LIST_TRAFEGO}/task", sub_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    audit_log(user["sub"], "move_creative", f"{body.creative_code} → {body.destination_status} (task {task_id})", ip)
 
     # Check if ALL creatives have been moved — if so, move parent to "testes concluídos"
     parent_action = None

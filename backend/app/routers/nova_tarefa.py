@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from app.auth import get_current_user
+from app.security import audit_log
 from app.config import (
     CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP,
     CF_NICHO, CF_FONTE, CF_OFERTA, CF_GESTOR_DROPDOWN,
@@ -117,6 +118,8 @@ def create_task(request: Request, body: CreateTaskRequest):
 
     try:
         result = clickup_post(f"/list/{CLICKUP_LIST_TRAFEGO}/task", task_data)
+        ip = request.client.host if request.client else "unknown"
+        audit_log(user["sub"], "create_task", f"task created: {name}", ip)
         return {
             "status": "ok",
             "task_id": result.get("id"),

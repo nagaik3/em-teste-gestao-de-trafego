@@ -1,5 +1,6 @@
 """Database connection and session management."""
 import os
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -43,6 +44,59 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(String, nullable=False)  # ISO format
+    user_email = Column(String, nullable=False, index=True)
+    action = Column(String, nullable=False, index=True)  # login_success, login_failed, logout, move_creative, claim_task, create_task
+    details = Column(String, default="")
+    ip_address = Column(String, default="")
+
+
+def log_audit(email: str, action: str, details: str = "", ip: str = ""):
+    """Insert an audit log entry into the database."""
+    if not SessionLocal:
+        return
+    db = SessionLocal()
+    try:
+        entry = AuditLog(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            user_email=email,
+            action=action,
+            details=details[:500],
+            ip_address=ip,
+        )
+        db.add(entry)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
+def get_audit_logs(limit: int = 100):
+    """Return the latest audit log entries."""
+    if not SessionLocal:
+        return []
+    db = SessionLocal()
+    try:
+        rows = db.query(AuditLog).order_by(AuditLog.id.desc()).limit(limit).all()
+        return [
+            {
+                "id": r.id,
+                "timestamp": r.timestamp,
+                "user_email": r.user_email,
+                "action": r.action,
+                "details": r.details,
+                "ip_address": r.ip_address,
+            }
+            for r in rows
+        ]
     finally:
         db.close()
 
