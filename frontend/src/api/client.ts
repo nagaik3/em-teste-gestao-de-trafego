@@ -7,10 +7,8 @@ class ApiError extends Error {
 
 async function handle<T>(r: Response): Promise<T> {
   if (r.status === 401) {
-    // Don't redirect if already on login page or if this is the /auth/me check
-    if (!window.location.pathname.startsWith("/login")) {
-      window.location.href = "/login"
-    }
+    // Only throw — let AuthContext and ProtectedRoute handle the redirect
+    // Full page reload via window.location would destroy React state (including post-login user)
     throw new ApiError("Sessao expirada", 401)
   }
   if (!r.ok) {
