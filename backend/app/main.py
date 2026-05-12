@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.auth import router as auth_router, get_current_user
+from app.database import init_db
 from app.routers.atribuidor import router as atribuidor_router
 from app.routers.gestao import router as gestao_router
 from app.routers.nova_tarefa import router as nova_tarefa_router
@@ -12,6 +13,9 @@ from app.routers.performance import router as performance_router
 from app.security import SecurityHeadersMiddleware, get_audit_log
 
 app = FastAPI(title="Gestao de Testes — IMPERA")
+
+# Initialize database tables on startup
+init_db()
 
 # Security headers
 app.add_middleware(SecurityHeadersMiddleware)

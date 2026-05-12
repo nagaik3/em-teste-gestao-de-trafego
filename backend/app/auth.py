@@ -6,7 +6,8 @@ from passlib.context import CryptContext
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel
 from typing import Optional
-from app.config import JWT_SECRET, JWT_ALGORITHM, USERS
+from app.config import JWT_SECRET, JWT_ALGORITHM
+from app.database import get_user_by_email
 from app.security import check_rate_limit, clear_rate_limit, audit_log
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -67,7 +68,7 @@ class LoginRequest(BaseModel):
 def login(body: LoginRequest, request: Request, response: Response):
     check_rate_limit(request)
 
-    user = USERS.get(body.email)
+    user = get_user_by_email(body.email)
     if not user or not pwd_context.verify(body.password, user["password_hash"]):
         audit_log(body.email, "login_failed", "Credenciais invalidas")
         raise HTTPException(status_code=401, detail="Credenciais invalidas")
@@ -108,7 +109,7 @@ def refresh(request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Refresh token expirado")
 
     email = payload["sub"]
-    user = USERS.get(email)
+    user = get_user_by_email(email)
     if not user:
         raise HTTPException(status_code=401, detail="Usuario nao encontrado")
 
