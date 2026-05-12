@@ -14,7 +14,7 @@ export default function Login() {
     e.preventDefault()
     setLoading(true); setError("")
     try { await login(email, password); nav("/", { replace: true }) }
-    catch { setError("Credenciais invalidas") }
+    catch (err: any) { setError(err?.message || "Credenciais invalidas") }
     finally { setLoading(false) }
   }
 

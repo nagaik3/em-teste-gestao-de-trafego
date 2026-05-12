@@ -1,9 +1,10 @@
 import os
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "impera-atribuidor-secret-2026")
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET:
+    JWT_SECRET = "dev-only-secret-not-for-production"  # Only for local dev
 REDTRACK_API_KEY = os.environ.get("REDTRACK_API_KEY", "")
 JWT_ALGORITHM = "HS256"
-JWT_ACCESS_EXPIRE_MINUTES = 60 * 24  # 24h
 
 CLICKUP_API_TOKEN = os.environ.get("CLICKUP_API_TOKEN", "")
 CLICKUP_LIST_TRAFEGO = "901324476398"
