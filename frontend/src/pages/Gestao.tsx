@@ -78,10 +78,17 @@ export default function Gestao({ gestor, role }: Props) {
                     </span>
                   </div>
                 </div>
-                {(t.fonte || t.copywriter) && (
-                  <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {(t.fonte || t.copywriter || t.material_link) && (
+                  <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                     {t.fonte && <span style={{ background: "rgba(91,141,239,0.12)", color: "#5b8def", padding: "1px 6px", borderRadius: 999, fontSize: 10, fontWeight: 600 }}>{t.fonte?.split(" - ")[0]}</span>}
                     {t.copywriter && <span style={{ color: textSecondary, fontSize: 11 }}>{t.copywriter}</span>}
+                    {t.material_link && (
+                      <a href={t.material_link} target="_blank" rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        style={{ background: "rgba(45,212,160,0.12)", color: "#2dd4a0", padding: "1px 6px", borderRadius: 999, fontSize: 10, fontWeight: 600, textDecoration: "none" }}>
+                        Material
+                      </a>
+                    )}
                   </div>
                 )}
               </button>
@@ -109,7 +116,13 @@ export default function Gestao({ gestor, role }: Props) {
           </div>
 
           <div style={{ padding: "12px 20px" }}>
-            <p style={{ fontFamily: "monospace", fontSize: 12, color: "#eceef2", wordBreak: "break-all", marginBottom: 16 }}>{creativeData.task.name}</p>
+            <p style={{ fontFamily: "monospace", fontSize: 12, color: "#eceef2", wordBreak: "break-all", marginBottom: 8 }}>{creativeData.task.name}</p>
+            {creativeData.task.material_link && (
+              <a href={creativeData.task.material_link} target="_blank" rel="noopener noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(45,212,160,0.12)", color: "#2dd4a0", padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: "none", marginBottom: 16 }}>
+                Abrir Material (Drive)
+              </a>
+            )}
 
             {creativeData.creatives.map((c: any) => {
               const perf = c.performance

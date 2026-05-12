@@ -8,7 +8,7 @@ from app.auth import get_current_user
 from app.security import audit_log
 from app.config import (
     CLICKUP_LIST_TRAFEGO, GESTOR_CLICKUP_MAP,
-    CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES, CF_GESTOR_DROPDOWN,
+    CF_NICHO, CF_COPYWRITER, CF_EDITOR, CF_FONTE, CF_OFERTA, CF_MES, CF_GESTOR_DROPDOWN, CF_LINK_MATERIAL,
 )
 from app.services.clickup import (
     get_list_tasks, get_task_detail, get_cf_value,
@@ -120,6 +120,7 @@ def _task_summary(t):
         "date_created": date_created,
         "has_alert": has_alert,
         "days_in_status": days_in_status,
+        "material_link": get_cf_value(t, CF_LINK_MATERIAL),
     }
 
 
@@ -236,6 +237,7 @@ def task_creatives(request: Request, task_id: str, gestor: str = Query(...)):
             "fonte": get_cf_value(task, CF_FONTE),
             "copywriter": get_cf_value(task, CF_COPYWRITER),
             "editor": get_cf_value(task, CF_EDITOR),
+            "material_link": get_cf_value(task, CF_LINK_MATERIAL),
         },
         "creatives": creative_list,
         "total": len(creatives),
