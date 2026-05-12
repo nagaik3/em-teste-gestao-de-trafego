@@ -61,7 +61,12 @@ def seed():
         print("ERROR: DATABASE_URL not set")
         return
 
-    init_db()
+    # Drop and recreate to ensure schema matches model (safe — only users table, seeded fresh)
+    from app.database import Base
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    print("  Tables recreated")
+
     db = SessionLocal()
 
     try:
