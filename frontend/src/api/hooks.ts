@@ -2,19 +2,25 @@ import { useQuery, useMutation } from "@tanstack/react-query"
 import { apiGet, apiPost } from "./client"
 
 // Types
-interface CountItem { nicho: string; regiao: string; count: number }
+interface CountItem { fonte: string; nicho: string; regiao: string; count: number }
+interface FonteCount { fonte: string; count: number }
+interface CountsResponse { counts: CountItem[]; fonte_counts: FonteCount[] }
 interface Task { id: string; name: string; nicho: string; regiao: string; oferta: string | null; fonte: string | null; copywriter: string | null; editor: string | null; mes: string | null; date_created: number; days_waiting?: number }
 interface TaskDetail extends Task { description: string; status: string; checklists: { name: string; items: { name: string; resolved: boolean }[] }[] }
 
 // Atribuidor
 export function useCounts() {
-  return useQuery<CountItem[]>({ queryKey: ["counts"], queryFn: () => apiGet<CountItem[]>("/api/atribuidor/counts") })
+  return useQuery<CountsResponse>({ queryKey: ["counts"], queryFn: () => apiGet<CountsResponse>("/api/atribuidor/counts") })
 }
 
-export function useTasks(nicho?: string | null, regiao?: string | null) {
+export function useTasks(nicho?: string | null, regiao?: string | null, fonte?: string | null) {
   return useQuery<Task[]>({
-    queryKey: ["tasks", nicho, regiao],
-    queryFn: () => apiGet<Task[]>("/api/atribuidor/tasks", { nicho: nicho!, regiao: regiao! }),
+    queryKey: ["tasks", nicho, regiao, fonte],
+    queryFn: () => {
+      const params: Record<string, string> = { nicho: nicho!, regiao: regiao! }
+      if (fonte) params.fonte = fonte
+      return apiGet<Task[]>("/api/atribuidor/tasks", params)
+    },
     enabled: !!nicho && !!regiao,
   })
 }

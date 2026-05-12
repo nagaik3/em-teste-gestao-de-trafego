@@ -11,6 +11,8 @@ export default function Gestao({ gestor, role }: Props) {
   const [moveModal, setMoveModal] = useState<{ code: string; suggestion?: string } | null>(null)
   const [destStatus, setDestStatus] = useState("")
   const [moveError, setMoveError] = useState("")
+  const [selectedCreatives, setSelectedCreatives] = useState<Set<string>>(new Set())
+  const [multiMoveProgress, setMultiMoveProgress] = useState("")
 
   const { data, isLoading, refetch: refetchTasks } = useGestaoTasks(gestor.key)
   const { data: creativeData, refetch: refetchCreatives } = useTaskCreatives(selectedTaskId, gestor.key)
@@ -19,26 +21,76 @@ export default function Gestao({ gestor, role }: Props) {
 
   const canWrite = role !== "visitante"
 
-  function handleMove() {
+  function toggleCreativeSelection(code: string) {
+    setSelectedCreatives(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code); else next.add(code)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (!creativeData) return
+    const unmoved = creativeData.creatives.filter((c: any) => !c.already_moved).map((c: any) => c.code as string)
+    const allSelected = unmoved.length > 0 && unmoved.every((code: string) => selectedCreatives.has(code))
+    if (allSelected) {
+      setSelectedCreatives(new Set())
+    } else {
+      setSelectedCreatives(new Set(unmoved))
+    }
+  }
+
+  async function handleMove() {
     if (!selectedTaskId || !moveModal || !destStatus) return
     setMoveError("")
     setParentMoved("")
-    moveMutation.mutate(
-      { taskId: selectedTaskId, creativeCode: moveModal.code, destinationStatus: destStatus, gestorNome: gestor.nome },
-      {
-        onSuccess: (res: any) => {
-          setMoveModal(null); setDestStatus(""); setMoveError("")
-          refetchCreatives()
-          if (res?.parent_action) {
-            const newStatus = res.parent_action === "testes_concluidos" ? "Testes Concluídos" : res.parent_action.replace("parent_moved_to_", "")
-            setParentMoved(newStatus)
-            refetchTasks()
-            setTimeout(() => { setParentMoved(""); setSelectedTaskId(null) }, 3000)
-          }
+
+    const codes = moveModal.code === "_MULTI" ? [...selectedCreatives] : [moveModal.code]
+
+    if (codes.length === 1) {
+      // Single move - use original .mutate flow
+      moveMutation.mutate(
+        { taskId: selectedTaskId, creativeCode: codes[0], destinationStatus: destStatus, gestorNome: gestor.nome },
+        {
+          onSuccess: (res: any) => {
+            setMoveModal(null); setDestStatus(""); setMoveError(""); setSelectedCreatives(new Set()); setMultiMoveProgress("")
+            refetchCreatives()
+            if (res?.parent_action) {
+              const newStatus = res.parent_action === "testes_concluidos" ? "Testes Concluídos" : res.parent_action.replace("parent_moved_to_", "")
+              setParentMoved(newStatus)
+              refetchTasks()
+              setTimeout(() => { setParentMoved(""); setSelectedTaskId(null) }, 3000)
+            }
+          },
+          onError: (err: any) => { setMoveError(err?.message || "Erro ao mover criativo. Tente novamente.") },
         },
-        onError: (err: any) => { setMoveError(err?.message || "Erro ao mover criativo. Tente novamente.") },
-      },
-    )
+      )
+      return
+    }
+
+    // Multi move - sequential with mutateAsync
+    for (let i = 0; i < codes.length; i++) {
+      setMultiMoveProgress(`Movendo ${i + 1}/${codes.length}...`)
+      try {
+        const res: any = await moveMutation.mutateAsync({
+          taskId: selectedTaskId, creativeCode: codes[i],
+          destinationStatus: destStatus, gestorNome: gestor.nome
+        })
+        if (i === codes.length - 1 && res?.parent_action) {
+          const newStatus = res.parent_action === "testes_concluidos" ? "Testes Concluídos" : res.parent_action.replace("parent_moved_to_", "")
+          setParentMoved(newStatus)
+          refetchTasks()
+          setTimeout(() => { setParentMoved(""); setSelectedTaskId(null) }, 3000)
+        }
+      } catch (err: any) {
+        setMoveError(`Erro no criativo ${codes[i]}: ${err?.message || "erro desconhecido"}`)
+        setMultiMoveProgress("")
+        break
+      }
+    }
+
+    setMoveModal(null); setDestStatus(""); setSelectedCreatives(new Set()); setMultiMoveProgress("")
+    refetchCreatives()
   }
 
   const groups = data?.groups || []
@@ -61,7 +113,7 @@ export default function Gestao({ gestor, role }: Props) {
           {group.tasks.map((t: any) => {
             const sel = selectedTaskId === t.id
             return (
-              <button key={t.id} onClick={() => setSelectedTaskId(sel ? null : t.id)} style={{
+              <button key={t.id} onClick={() => { setSelectedTaskId(sel ? null : t.id); setSelectedCreatives(new Set()) }} style={{
                 display: "block", width: "100%", textAlign: "left", background: sel ? "#1e222e" : card,
                 border: `1px solid ${sel ? gold : border}`, borderLeft: `3px solid ${sel ? gold : STATUS_COLORS[group.status] || "transparent"}`,
                 borderRadius: 10, padding: 14, marginBottom: 6, cursor: "pointer", transition: "all 0.15s",
@@ -112,16 +164,32 @@ export default function Gestao({ gestor, role }: Props) {
               <span style={{ color: gold, fontWeight: 600, fontSize: 14 }}>Criativos</span>
               <span style={{ color: textTertiary, fontSize: 12, marginLeft: 8, fontFamily: "monospace" }}>{creativeData.moved}/{creativeData.total}</span>
             </div>
-            <button onClick={() => setSelectedTaskId(null)} style={{ background: "none", border: "none", color: textSecondary, fontSize: 18, cursor: "pointer" }}>x</button>
+            <button onClick={() => { setSelectedTaskId(null); setSelectedCreatives(new Set()) }} style={{ background: "none", border: "none", color: textSecondary, fontSize: 18, cursor: "pointer" }}>x</button>
           </div>
 
-          <div style={{ padding: "12px 20px" }}>
+          <div style={{ padding: "12px 20px", paddingBottom: selectedCreatives.size > 0 ? 70 : 12 }}>
             <p style={{ fontFamily: "monospace", fontSize: 12, color: "#eceef2", wordBreak: "break-all", marginBottom: 8 }}>{creativeData.task.name}</p>
             {creativeData.task.material_link && (
               <a href={creativeData.task.material_link} target="_blank" rel="noopener noreferrer"
                 style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(45,212,160,0.12)", color: "#2dd4a0", padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: "none", marginBottom: 16 }}>
                 Abrir Material (Drive)
               </a>
+            )}
+
+            {/* Select all row */}
+            {canWrite && creativeData.creatives.some((c: any) => !c.already_moved) && (
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "6px 0" }}>
+                  <input type="checkbox"
+                    checked={creativeData.creatives.filter((c: any) => !c.already_moved).length > 0 && creativeData.creatives.filter((c: any) => !c.already_moved).every((c: any) => selectedCreatives.has(c.code))}
+                    onChange={toggleSelectAll}
+                    style={{ accentColor: gold, width: 14, height: 14, cursor: "pointer" }}
+                  />
+                  <span style={{ fontSize: 12, color: textSecondary }}>Selecionar Todos</span>
+                  {selectedCreatives.size > 0 && <span style={{ fontSize: 11, color: gold, fontFamily: "monospace" }}>({selectedCreatives.size})</span>}
+                </label>
+                <div style={{ borderBottom: `1px solid ${border}`, marginTop: 4 }} />
+              </div>
             )}
 
             {creativeData.creatives.map((c: any) => {
@@ -134,6 +202,14 @@ export default function Gestao({ gestor, role }: Props) {
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {!c.already_moved && canWrite && (
+                        <input type="checkbox"
+                          checked={selectedCreatives.has(c.code)}
+                          onChange={() => toggleCreativeSelection(c.code)}
+                          onClick={e => e.stopPropagation()}
+                          style={{ accentColor: gold, width: 14, height: 14, cursor: "pointer", flexShrink: 0 }}
+                        />
+                      )}
                       <span style={{ fontFamily: "monospace", fontSize: 13, color: "#eceef2", fontWeight: 600 }}>{c.code === "_SINGLE" ? creativeData.task.name : c.code}</span>
                       {c.already_moved && (
                         <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 999, background: STATUS_COLORS[c.existing_status] + "22", color: STATUS_COLORS[c.existing_status] || textTertiary }}>
@@ -165,6 +241,16 @@ export default function Gestao({ gestor, role }: Props) {
               )
             })}
           </div>
+
+          {/* Mover Selecionados - fixed bottom button */}
+          {selectedCreatives.size > 0 && canWrite && (
+            <div style={{ position: "sticky", bottom: 0, padding: "12px 20px", background: surface, borderTop: `1px solid ${border}` }}>
+              <button onClick={() => { setMoveModal({ code: "_MULTI" }); setDestStatus("") }}
+                style={{ width: "100%", padding: "10px 16px", background: gold, color: "#08090c", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                Mover Selecionados ({selectedCreatives.size})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -172,9 +258,15 @@ export default function Gestao({ gestor, role }: Props) {
       {moveModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60 }}>
           <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 24, width: 380, maxWidth: "90vw" }}>
-            <p style={{ color: gold, fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Mover Criativo</p>
+            <p style={{ color: gold, fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+              {moveModal.code === "_MULTI" ? `Mover ${selectedCreatives.size} Criativos` : "Mover Criativo"}
+            </p>
             <p style={{ color: textSecondary, fontSize: 13, marginBottom: 16 }}>
-              <strong style={{ color: "#eceef2" }}>{moveModal.code === "_SINGLE" ? "Tarefa" : moveModal.code}</strong> sera {moveModal.code === "_SINGLE" ? "movida para o" : "criado como subtarefa no"} status selecionado.
+              {moveModal.code === "_MULTI" ? (
+                <><strong style={{ color: "#eceef2" }}>{selectedCreatives.size} criativos</strong> serao criados como subtarefas no status selecionado.</>
+              ) : (
+                <><strong style={{ color: "#eceef2" }}>{moveModal.code === "_SINGLE" ? "Tarefa" : moveModal.code}</strong> sera {moveModal.code === "_SINGLE" ? "movida para o" : "criado como subtarefa no"} status selecionado.</>
+              )}
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
@@ -197,13 +289,13 @@ export default function Gestao({ gestor, role }: Props) {
             {moveError && <p style={{ color: "#f06060", fontSize: 12, marginBottom: 12, padding: "8px 12px", background: "rgba(240,96,96,0.1)", borderRadius: 6 }}>{moveError}</p>}
 
             <div style={{ display: "flex", gap: 12 }}>
-              <button onClick={() => { setMoveModal(null); setDestStatus(""); setMoveError("") }} disabled={moveMutation.isPending}
-                style={{ flex: 1, padding: 10, background: "#181b24", border: `1px solid ${border}`, borderRadius: 8, color: textSecondary, fontSize: 13, cursor: "pointer" }}>
+              <button onClick={() => { setMoveModal(null); setDestStatus(""); setMoveError(""); setMultiMoveProgress("") }} disabled={moveMutation.isPending || !!multiMoveProgress}
+                style={{ flex: 1, padding: 10, background: "#181b24", border: `1px solid ${border}`, borderRadius: 8, color: textSecondary, fontSize: 13, cursor: moveMutation.isPending || multiMoveProgress ? "not-allowed" : "pointer" }}>
                 Cancelar
               </button>
-              <button onClick={handleMove} disabled={moveMutation.isPending || !destStatus}
-                style={{ flex: 1, padding: 10, background: !destStatus || moveMutation.isPending ? "#555a6e" : gold, border: "none", borderRadius: 8, color: "#08090c", fontSize: 13, fontWeight: 600, cursor: !destStatus || moveMutation.isPending ? "not-allowed" : "pointer" }}>
-                {moveMutation.isPending ? "Criando..." : "Confirmar"}
+              <button onClick={handleMove} disabled={moveMutation.isPending || !destStatus || !!multiMoveProgress}
+                style={{ flex: 1, padding: 10, background: !destStatus || moveMutation.isPending || multiMoveProgress ? "#555a6e" : gold, border: "none", borderRadius: 8, color: "#08090c", fontSize: 13, fontWeight: 600, cursor: !destStatus || moveMutation.isPending || multiMoveProgress ? "not-allowed" : "pointer" }}>
+                {multiMoveProgress ? multiMoveProgress : moveMutation.isPending ? "Criando..." : "Confirmar"}
               </button>
             </div>
           </div>

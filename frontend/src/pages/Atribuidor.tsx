@@ -9,19 +9,26 @@ function daysColor(d: number) { return d > 7 ? "#f06060" : d >= 4 ? "#f0b840" : 
 interface Props { gestor: { nome: string; key: string }; role: string }
 
 export default function Atribuidor({ gestor, role }: Props) {
+  const [fonte, setFonte] = useState<string | null>(null)
   const [nicho, setNicho] = useState<string | null>(null)
   const [regiao, setRegiao] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
 
-  const { data: counts = [] } = useCounts()
-  const { data: tasks = [], isLoading, refetch } = useTasks(nicho, regiao)
+  const { data: countsData } = useCounts()
+  const fonteCounts = countsData?.fonte_counts ?? []
+  const counts = countsData?.counts ?? []
+  const { data: tasks = [], isLoading, refetch } = useTasks(nicho, regiao, fonte)
   const { data: detail } = useTaskDetail(selectedId)
   const claim = useClaim()
 
   const canWrite = role !== "visitante"
 
-  function getCount(n: string, r?: string) { return counts.filter(c => c.nicho === n && (!r || c.regiao === r)).reduce((s, c) => s + c.count, 0) }
+  function getCount(n: string, r?: string) {
+    return counts
+      .filter(c => c.nicho === n && (!r || c.regiao === r) && (!fonte || c.fonte === fonte))
+      .reduce((s, c) => s + c.count, 0)
+  }
 
   function handleClaim() {
     if (!selectedId) return
@@ -30,8 +37,25 @@ export default function Atribuidor({ gestor, role }: Props) {
     })
   }
 
+  const totalAllFontes = fonteCounts.reduce((s, f) => s + f.count, 0)
+
   return (
     <div>
+      {/* Fonte picker */}
+      <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <p style={{ color: textSecondary, fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Fonte de Trafego</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <button onClick={() => { setFonte(null); setNicho(null); setRegiao(null); setSelectedId(null) }} style={{ ...pill(fonte === null), opacity: totalAllFontes === 0 ? 0.3 : 1 }}>
+            Todos<span style={{ marginLeft: 6, opacity: 0.7, fontFamily: "monospace" }}>{totalAllFontes}</span>
+          </button>
+          {fonteCounts.map(f => (
+            <button key={f.fonte} onClick={() => { setFonte(f.fonte); setNicho(null); setRegiao(null); setSelectedId(null) }} style={{ ...pill(fonte === f.fonte) }}>
+              {f.fonte}<span style={{ marginLeft: 6, opacity: 0.7, fontFamily: "monospace" }}>{f.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Nicho picker */}
       <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
         <p style={{ color: textSecondary, fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Nicho</p>

@@ -64,20 +64,32 @@ def _task_detail(t):
 def counts(request: Request):
     user = get_current_user(request)
     tasks = get_list_tasks(CLICKUP_LIST_TRAFEGO, statuses=["aguardando teste"])
-    c = defaultdict(lambda: defaultdict(int))
+    c = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    fonte_counts = defaultdict(int)
     for t in tasks:
         if t.get("parent"):
             continue
         name = t.get("name", "")
         nicho = (get_cf_value(t, CF_NICHO) or _detect_nicho(name)).split(" - ")[0].strip()
         regiao = _detect_mercado(name)
+        raw_fonte = get_cf_value(t, CF_FONTE)
+        fonte_name = raw_fonte.split(" - ")[0].strip() if raw_fonte else "Sem fonte"
         if nicho:
-            c[nicho][regiao] += 1
-    return [{"nicho": n, "regiao": r, "count": c[n][r]} for n in NICHOS for r in ["BR", "EUA"] if c.get(n, {}).get(r, 0) > 0]
+            c[fonte_name][nicho][regiao] += 1
+            fonte_counts[fonte_name] += 1
+    detail_counts = []
+    for fonte in c:
+        for n in NICHOS:
+            for r in ["BR", "EUA"]:
+                val = c[fonte].get(n, {}).get(r, 0)
+                if val > 0:
+                    detail_counts.append({"fonte": fonte, "nicho": n, "regiao": r, "count": val})
+    fonte_list = [{"fonte": f, "count": fonte_counts[f]} for f in sorted(fonte_counts, key=lambda x: fonte_counts[x], reverse=True)]
+    return {"counts": detail_counts, "fonte_counts": fonte_list}
 
 
 @router.get("/tasks")
-def list_tasks(request: Request, nicho: str = Query(...), regiao: str = Query("BR")):
+def list_tasks(request: Request, nicho: str = Query(...), regiao: str = Query("BR"), fonte: Optional[str] = Query(None)):
     user = get_current_user(request)
     tasks = get_list_tasks(CLICKUP_LIST_TRAFEGO, statuses=["aguardando teste"])
     filtered = []
@@ -87,6 +99,11 @@ def list_tasks(request: Request, nicho: str = Query(...), regiao: str = Query("B
         name = t.get("name", "")
         t_nicho = (get_cf_value(t, CF_NICHO) or _detect_nicho(name)).split(" - ")[0].strip()
         if t_nicho == nicho.upper() and _detect_mercado(name) == regiao.upper():
+            if fonte:
+                raw_fonte = get_cf_value(t, CF_FONTE)
+                t_fonte = raw_fonte.split(" - ")[0].strip() if raw_fonte else "Sem fonte"
+                if t_fonte != fonte:
+                    continue
             filtered.append(_task_summary(t))
     filtered.sort(key=lambda x: x["date_created"])
     return filtered
