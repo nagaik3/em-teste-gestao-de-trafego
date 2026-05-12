@@ -86,3 +86,34 @@ export function useCreateTask() {
       apiPost("/api/nova-tarefa/create", data as any),
   })
 }
+
+// === DATA LAKE ===
+
+export function useDatalakeSlasAtivos() {
+  return useQuery<any[]>({
+    queryKey: ["dl-slas-ativos"],
+    queryFn: () => apiGet<any[]>("/api/datalake/slas/ativos"),
+    refetchInterval: 60_000,
+  })
+}
+
+export function useDatalakeSlasResumo() {
+  return useQuery<any[]>({
+    queryKey: ["dl-slas-resumo"],
+    queryFn: () => apiGet<any[]>("/api/datalake/slas/resumo"),
+  })
+}
+
+export function useDatalakeAssertividade() {
+  return useQuery<any[]>({
+    queryKey: ["dl-assertividade"],
+    queryFn: () => apiGet<any[]>("/api/datalake/assertividade"),
+  })
+}
+
+export function useDatalakePerformanceResumo() {
+  return useQuery<any>({
+    queryKey: ["dl-perf-resumo"],
+    queryFn: () => apiGet<any>("/api/datalake/performance/resumo"),
+  })
+}

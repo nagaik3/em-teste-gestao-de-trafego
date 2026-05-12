@@ -10,6 +10,7 @@ from app.routers.atribuidor import router as atribuidor_router
 from app.routers.gestao import router as gestao_router
 from app.routers.nova_tarefa import router as nova_tarefa_router
 from app.routers.performance import router as performance_router
+from app.routers.datalake import router as datalake_router
 from app.security import SecurityHeadersMiddleware, get_audit_log
 
 app = FastAPI(title="Gestao de Testes — IMPERA")
@@ -36,6 +37,7 @@ app.include_router(atribuidor_router)
 app.include_router(gestao_router)
 app.include_router(nova_tarefa_router)
 app.include_router(performance_router)
+app.include_router(datalake_router)
 
 
 @app.get("/health")

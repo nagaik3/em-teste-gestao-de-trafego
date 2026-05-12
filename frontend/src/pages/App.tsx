@@ -4,8 +4,10 @@ import { useAuth } from "../auth/AuthContext"
 import Atribuidor from "./Atribuidor"
 import Gestao from "./Gestao"
 import NovaTarefa from "./NovaTarefa"
+import KanbanEsteira from "./KanbanEsteira"
+import RaioXCopy from "./RaioXCopy"
 
-type Tab = "atribuidor" | "gestao" | "nova-tarefa"
+type Tab = "atribuidor" | "gestao" | "nova-tarefa" | "kanban" | "raio-x"
 
 export default function App() {
   const { user, logout } = useAuth()
@@ -25,11 +27,15 @@ export default function App() {
   // For admin/visitante: show gestor picker if none selected
   const needsGestorPick = role !== "gestor" && !gestor
 
-  // Build tab list (hide Nova Tarefa for visitante)
+  // Build tab list (hide Nova Tarefa for visitante, Data Lake tabs for admin only)
   const tabs: { id: Tab; label: string }[] = [
     { id: "gestao", label: "Gestao" },
     { id: "atribuidor", label: "Atribuidor" },
     ...(role !== "visitante" ? [{ id: "nova-tarefa" as Tab, label: "Nova Tarefa" }] : []),
+    ...(role === "admin" ? [
+      { id: "kanban" as Tab, label: "Kanban" },
+      { id: "raio-x" as Tab, label: "Raio-X" },
+    ] : []),
   ]
 
   // Role badge
@@ -122,6 +128,8 @@ export default function App() {
       {activeTab === "atribuidor" && gestor && <Atribuidor gestor={gestor} role={role} />}
       {activeTab === "gestao" && gestor && <Gestao gestor={gestor} role={role} />}
       {activeTab === "nova-tarefa" && gestor && <NovaTarefa gestor={gestor} role={role} />}
+      {activeTab === "kanban" && <KanbanEsteira />}
+      {activeTab === "raio-x" && <RaioXCopy />}
     </div>
   )
 }
