@@ -145,6 +145,7 @@ def slas_ativos(request: Request):
         FROM impera.fact_slas_esteira s
         LEFT JOIN impera.dim_criativos_clickup d ON s.task_id_clickup = d.task_id_clickup
         WHERE s.data_saida IS NULL
+          AND (d.nome_nomenclatura IS NULL OR d.nome_nomenclatura NOT LIKE '%%[LEGADO]%%')
         ORDER BY EXTRACT(EPOCH FROM (NOW() - s.data_entrada)) DESC
     """)
 
@@ -203,13 +204,13 @@ def assertividade(request: Request):
     return _query("""
         WITH produzidos AS (
             SELECT copywriter, COUNT(DISTINCT base_ref) AS total_criativos
-            FROM impera.dim_criativos_clickup WHERE copywriter IS NOT NULL GROUP BY copywriter
+            FROM impera.view_dim_ativa WHERE copywriter IS NOT NULL GROUP BY copywriter
         ),
         validados AS (
             SELECT d.copywriter, COUNT(DISTINCT p.base_ref) AS criativos_validados,
                    ROUND(SUM(p.fat_front)::numeric, 0) AS faturamento_validados
             FROM impera.fact_performance_redtrack p
-            JOIN impera.dim_criativos_clickup d ON p.base_ref = d.base_ref
+            JOIN impera.view_dim_ativa d ON p.base_ref = d.base_ref
             WHERE d.copywriter IS NOT NULL AND p.vendas >= 10
               AND ROUND(p.fat_front / NULLIF(p.custo, 0), 2) >= 1.8
               AND p.data_registro >= CURRENT_DATE - INTERVAL '30 days'
@@ -221,7 +222,7 @@ def assertividade(request: Request):
                    ROUND(SUM(p.fat_front)::numeric, 0) AS faturamento_total,
                    SUM(p.vendas) AS vendas_total
             FROM impera.fact_performance_redtrack p
-            JOIN impera.dim_criativos_clickup d ON p.base_ref = d.base_ref
+            JOIN impera.view_dim_ativa d ON p.base_ref = d.base_ref
             WHERE d.copywriter IS NOT NULL
               AND p.data_registro >= CURRENT_DATE - INTERVAL '30 days'
             GROUP BY d.copywriter
