@@ -45,6 +45,38 @@ def health():
     return {"status": "ok"}
 
 
+# --- Webhook receiver (temporary bridge until VPS impera-core is live) ---
+import json
+import logging
+
+_webhook_log = logging.getLogger("webhooks")
+_webhook_events: list[dict] = []
+
+
+@app.post("/webhooks/clickup")
+async def clickup_webhook(request: Request):
+    body = await request.body()
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return {"error": "invalid json"}
+    # ClickUp challenge handshake
+    if "challenge" in payload:
+        return {"challenge": payload["challenge"]}
+    event_type = payload.get("event", "unknown")
+    task_id = payload.get("task_id", "")
+    _webhook_events.append({"event": event_type, "task_id": task_id})
+    if len(_webhook_events) > 100:
+        _webhook_events.pop(0)
+    _webhook_log.info("WEBHOOK: %s task=%s", event_type, task_id)
+    return {"status": "received", "event": event_type, "task_id": task_id}
+
+
+@app.get("/webhooks/log")
+def webhook_log():
+    return {"total": len(_webhook_events), "last_10": _webhook_events[-10:]}
+
+
 @app.get("/auth/audit")
 def audit(request: Request):
     user = get_current_user(request)
