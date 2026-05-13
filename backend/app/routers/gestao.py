@@ -245,6 +245,48 @@ def task_creatives(request: Request, task_id: str, gestor: str = Query(...)):
     }
 
 
+class RevertRequest(BaseModel):
+    gestor_nome: str
+
+
+@router.post("/tasks/{task_id}/revert")
+def revert_to_aguardando(request: Request, task_id: str, body: RevertRequest):
+    """Reverte uma tarefa de 'em teste' para 'aguardando teste'."""
+    user = get_current_user(request)
+    if user["role"] == "visitante":
+        raise HTTPException(status_code=403, detail="Visitantes nao podem reverter tarefas")
+    if user["role"] == "gestor":
+        body.gestor_nome = user["nome"]
+
+    from app.services.clickup import update_task_status as _update
+
+    try:
+        task = get_task_detail(task_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    current = task.get("status", {}).get("status", "")
+    if current != "em teste":
+        raise HTTPException(status_code=400, detail=f"Tarefa nao esta em teste (status atual: {current})")
+
+    try:
+        _update(task_id, "aguardando teste")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    try:
+        clickup_post(f"/task/{task_id}/comment", {
+            "comment_text": f"Tarefa revertida para aguardando teste por {body.gestor_nome}.",
+            "notify_all": False,
+        })
+    except Exception:
+        pass
+
+    ip = request.client.host if request.client else "unknown"
+    audit_log(user["sub"], "revert_task", f"task {task_id} revertida para aguardando teste", ip)
+    return {"status": "ok", "task_id": task_id, "new_status": "aguardando teste"}
+
+
 class MoveCreativeRequest(BaseModel):
     creative_code: str
     destination_status: str

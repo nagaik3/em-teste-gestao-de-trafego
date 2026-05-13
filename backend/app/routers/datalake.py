@@ -222,31 +222,47 @@ def orfaos_resumo(request: Request):
 
 @router.get("/assertividade")
 def assertividade(request: Request):
+    """Fonte: public.fato_performance (ETL diário) + impera.view_dim_ativa."""
     _require_admin(request)
     return _query("""
-        WITH produzidos AS (
+        WITH perf_with_ref AS (
+            SELECT cost, revenue_front, vendas_total,
+                CASE
+                    WHEN regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g') ~ '^\\s*AD\\d+'
+                        THEN (regexp_match(regexp_replace(regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g'), '\\s+', '', 'g'), '^(AD\\d+)'))[1]
+                    WHEN regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g') ~ '^\\s*ADC\\d+'
+                        THEN 'C' || (regexp_match(regexp_replace(regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g'), '\\s+', '', 'g'), '^ADC(\\d+)'))[1]
+                    WHEN regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g') ~ '^\\s*C[EYC]\\d+'
+                        THEN (regexp_match(regexp_replace(regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g'), '\\s+', '', 'g'), '^(C[EYC]\\d+)'))[1]
+                    WHEN regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g') ~ '^\\s*C\\d+'
+                        THEN (regexp_match(regexp_replace(regexp_replace(upper(adgroup_name), '\\[.*?\\]', '', 'g'), '\\s+', '', 'g'), '^(C\\d+)'))[1]
+                    ELSE NULL
+                END AS base_ref
+            FROM public.fato_performance
+            WHERE data >= CURRENT_DATE - INTERVAL '30 days'
+        ),
+        produzidos AS (
             SELECT copywriter, COUNT(DISTINCT base_ref) AS total_criativos
             FROM impera.view_dim_ativa WHERE copywriter IS NOT NULL GROUP BY copywriter
         ),
         validados AS (
             SELECT d.copywriter, COUNT(DISTINCT p.base_ref) AS criativos_validados,
-                   ROUND(SUM(p.fat_front)::numeric, 0) AS faturamento_validados
-            FROM impera.fact_performance_redtrack p
+                   ROUND(SUM(p.revenue_front)::numeric, 0) AS faturamento_validados
+            FROM perf_with_ref p
             JOIN impera.view_dim_ativa d ON p.base_ref = d.base_ref
-            WHERE d.copywriter IS NOT NULL AND p.vendas >= 10
-              AND ROUND(p.fat_front / NULLIF(p.custo, 0), 2) >= 1.8
-              AND p.data_registro >= CURRENT_DATE - INTERVAL '30 days'
+            WHERE d.copywriter IS NOT NULL AND p.base_ref IS NOT NULL
+              AND p.vendas_total >= 10
+              AND ROUND(p.revenue_front / NULLIF(p.cost, 0), 2) >= 1.8
             GROUP BY d.copywriter
         ),
         testados AS (
             SELECT d.copywriter, COUNT(DISTINCT p.base_ref) AS criativos_testados,
-                   ROUND(SUM(p.custo)::numeric, 0) AS custo_total,
-                   ROUND(SUM(p.fat_front)::numeric, 0) AS faturamento_total,
-                   SUM(p.vendas) AS vendas_total
-            FROM impera.fact_performance_redtrack p
+                   ROUND(SUM(p.cost)::numeric, 0) AS custo_total,
+                   ROUND(SUM(p.revenue_front)::numeric, 0) AS faturamento_total,
+                   SUM(p.vendas_total) AS vendas_total
+            FROM perf_with_ref p
             JOIN impera.view_dim_ativa d ON p.base_ref = d.base_ref
-            WHERE d.copywriter IS NOT NULL
-              AND p.data_registro >= CURRENT_DATE - INTERVAL '30 days'
+            WHERE d.copywriter IS NOT NULL AND p.base_ref IS NOT NULL
             GROUP BY d.copywriter
         )
         SELECT pr.copywriter, pr.total_criativos,

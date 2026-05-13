@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useGestaoTasks, useTaskCreatives, useMoveCreative } from "../api/hooks"
+import { useGestaoTasks, useTaskCreatives, useMoveCreative, useRevertTask } from "../api/hooks"
 import { gold, goldDim, card, border, surface, textSecondary, textTertiary, STATUS_COLORS } from "../styles/theme"
 
 interface Props { gestor: { nome: string; key: string }; role: string }
@@ -17,6 +17,7 @@ export default function Gestao({ gestor, role }: Props) {
   const { data, isLoading, refetch: refetchTasks } = useGestaoTasks(gestor.key)
   const { data: creativeData, refetch: refetchCreatives } = useTaskCreatives(selectedTaskId, gestor.key)
   const moveMutation = useMoveCreative()
+  const revertMutation = useRevertTask()
   const [parentMoved, setParentMoved] = useState("")
 
   const canWrite = role !== "visitante"
@@ -130,7 +131,7 @@ export default function Gestao({ gestor, role }: Props) {
                     </span>
                   </div>
                 </div>
-                {(t.fonte || t.copywriter || t.material_link) && (
+                {(t.fonte || t.copywriter || t.material_link || (group.status === "em teste" && canWrite)) && (
                   <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                     {t.fonte && <span style={{ background: "rgba(91,141,239,0.12)", color: "#5b8def", padding: "1px 6px", borderRadius: 999, fontSize: 10, fontWeight: 600 }}>{t.fonte?.split(" - ")[0]}</span>}
                     {t.copywriter && <span style={{ color: textSecondary, fontSize: 11 }}>{t.copywriter}</span>}
@@ -140,6 +141,25 @@ export default function Gestao({ gestor, role }: Props) {
                         style={{ background: "rgba(45,212,160,0.12)", color: "#2dd4a0", padding: "1px 6px", borderRadius: 999, fontSize: 10, fontWeight: 600, textDecoration: "none" }}>
                         Material
                       </a>
+                    )}
+                    {group.status === "em teste" && canWrite && (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (revertMutation.isPending) return
+                          revertMutation.mutate(
+                            { taskId: t.id, gestorNome: gestor.nome },
+                            { onSuccess: () => refetchTasks() },
+                          )
+                        }}
+                        style={{
+                          background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "none",
+                          padding: "1px 6px", borderRadius: 999, fontSize: 10, fontWeight: 600,
+                          cursor: revertMutation.isPending ? "not-allowed" : "pointer",
+                          opacity: revertMutation.isPending ? 0.5 : 1,
+                        }}>
+                        &#8635; Reverter
+                      </button>
                     )}
                   </div>
                 )}

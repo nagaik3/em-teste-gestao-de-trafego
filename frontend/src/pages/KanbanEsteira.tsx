@@ -3,10 +3,11 @@ import { gold, card, border, textSecondary, textPrimary } from "../styles/theme"
 
 const COLUNAS = [
   { id: "Escrevendo - Copy", titulo: "Escrevendo (Copy)", cor: gold },
-  { id: "Pre-Producao", titulo: "Pre-Producao", cor: "#3b82f6" },
-  { id: "Producao", titulo: "Producao / Edicao", cor: "#8b5cf6" },
-  { id: "Avaliacao", titulo: "Avaliacao", cor: "#06b6d4" },
-  { id: "Alteracao", titulo: "Alteracao", cor: "#f59e0b" },
+  { id: "Pré-Produção", titulo: "Pre-Producao", cor: "#3b82f6" },
+  { id: "Produção", titulo: "Producao / Edicao", cor: "#8b5cf6" },
+  { id: "Avaliação - Pós Edição", titulo: "Avaliacao (Pos Edicao)", cor: "#06b6d4" },
+  { id: "Avaliação - Pós Alteração", titulo: "Avaliacao (Pos Alteracao)", cor: "#0ea5e9" },
+  { id: "Alteração", titulo: "Alteracao", cor: "#f59e0b" },
   { id: "Freelancer", titulo: "Freelancer", cor: "#ec4899" },
 ]
 
@@ -30,11 +31,7 @@ export default function KanbanEsteira() {
   const resumoData = resumo || []
   const vol = volume || { semana: 0, mes: 0 }
 
-  const match = (fase: string, colId: string) => {
-    if (colId === "Pre-Producao") return fase.toLowerCase().includes("pr") && fase.toLowerCase().includes("produ")
-    if (colId === "Avaliacao") return fase.toLowerCase().includes("avalia")
-    return fase.includes(colId.split(" - ")[0]) || fase === colId
-  }
+  const match = (fase: string, colId: string) => fase === colId
 
   const totalAtrasadas = items.filter((c: any) => Number(c.horas_na_fase || 0) >= 24).length
 

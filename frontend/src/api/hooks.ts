@@ -70,6 +70,13 @@ export function useMoveCreative() {
   })
 }
 
+export function useRevertTask() {
+  return useMutation({
+    mutationFn: ({ taskId, gestorNome }: { taskId: string; gestorNome: string }) =>
+      apiPost(`/api/gestao/tasks/${taskId}/revert`, { gestor_nome: gestorNome }),
+  })
+}
+
 // Nova Tarefa
 interface FormOptions { nichos: any[]; regioes: any[]; fontes: any[]; ofertas: any[]; gestores: any[] }
 

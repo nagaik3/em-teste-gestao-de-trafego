@@ -97,14 +97,20 @@ def list_tasks(request: Request, nicho: str = Query(...), regiao: str = Query("B
         if t.get("parent"):
             continue
         name = t.get("name", "")
-        t_nicho = (get_cf_value(t, CF_NICHO) or _detect_nicho(name)).split(" - ")[0].strip()
-        if t_nicho == nicho.upper() and _detect_mercado(name) == regiao.upper():
-            if fonte:
-                raw_fonte = get_cf_value(t, CF_FONTE)
-                t_fonte = raw_fonte.split(" - ")[0].strip() if raw_fonte else "Sem fonte"
-                if t_fonte != fonte:
-                    continue
-            filtered.append(_task_summary(t))
+        t_nicho = (get_cf_value(t, CF_NICHO) or _detect_nicho(name)).split(" - ")[0].strip().upper()
+        t_regiao = _detect_mercado(name).upper()
+        if t_nicho != nicho.strip().upper() or t_regiao != regiao.strip().upper():
+            continue
+        if fonte and fonte != "Sem fonte":
+            raw_fonte = get_cf_value(t, CF_FONTE)
+            t_fonte = raw_fonte.split(" - ")[0].strip() if raw_fonte else ""
+            if t_fonte != fonte:
+                continue
+        elif fonte == "Sem fonte":
+            raw_fonte = get_cf_value(t, CF_FONTE)
+            if raw_fonte and raw_fonte.strip():
+                continue
+        filtered.append(_task_summary(t))
     filtered.sort(key=lambda x: x["date_created"])
     return filtered
 

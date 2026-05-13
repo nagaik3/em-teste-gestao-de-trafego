@@ -18,16 +18,19 @@ function DeltaBadge({ value }: { value: number | null | undefined }) {
   )
 }
 
-function KpiCard({ label, value, sub, color, delta }: {
-  label: string; value: string; sub?: string; color?: string; delta?: number | null
+function KpiCard({ label, value, sub, color, delta, hojeValue }: {
+  label: string; value: string; sub?: string; color?: string; delta?: number | null; hojeValue?: string
 }) {
   return (
     <div>
       <p style={{ fontSize: 10, color: textSecondary, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", margin: 0 }}>{label}</p>
-      <div style={{ display: "flex", alignItems: "baseline", margin: "4px 0 0" }}>
-        <p style={{ fontSize: 26, fontWeight: 800, color: color || textPrimary, margin: 0, lineHeight: 1 }}>{value}</p>
-        <DeltaBadge value={delta} />
-      </div>
+      <p style={{ fontSize: 26, fontWeight: 800, color: color || textPrimary, margin: "4px 0 0", lineHeight: 1 }}>{value}</p>
+      {hojeValue != null && (
+        <div style={{ display: "flex", alignItems: "baseline", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 11, color: textSecondary, margin: 0 }}>Hoje: {hojeValue}</p>
+          <DeltaBadge value={delta} />
+        </div>
+      )}
       {sub && <p style={{ fontSize: 11, color: textSecondary, margin: "2px 0 0" }}>{sub}</p>}
     </div>
   )
@@ -100,19 +103,27 @@ export default function VisaoExecutiva() {
           <KpiCard label="MC BR" value={BRL(mcBr)} color={mcBr >= 0 ? accent.green : accent.red} />
         </div>
         <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 10, padding: 14 }}>
-          <KpiCard label="ROAS Front" value={roas.toFixed(2)} color={roas >= 1.8 ? accent.green : accent.yellow} delta={dRoas} />
+          <KpiCard label="ROAS Front" value={roas.toFixed(2)} color={roas >= 1.8 ? accent.green : accent.yellow}
+            hojeValue={Number(p.hoje_roas || 0).toFixed(2)} delta={dRoas} />
         </div>
         <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 10, padding: 14 }}>
-          <KpiCard label="Faturamento" value={BRL(fatTotal)} delta={dFat} />
+          <KpiCard label="Faturamento" value={BRL(fatTotal)}
+            hojeValue={BRL(Number(p.hoje_fat || 0))} delta={dFat} />
         </div>
         <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 10, padding: 14 }}>
-          <KpiCard label="Investimento" value={BRL(custoTotal)} delta={dCusto} />
+          <KpiCard label="Investimento" value={BRL(custoTotal)}
+            hojeValue={BRL(Number(p.hoje_custo || 0))} delta={dCusto} />
         </div>
         <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 10, padding: 14 }}>
-          <KpiCard label="Vendas" value={vendasTotal.toLocaleString("pt-BR")} delta={dVendas}
+          <KpiCard label="Vendas" value={vendasTotal.toLocaleString("pt-BR")}
+            hojeValue={String(Number(p.hoje_vendas || 0))} delta={dVendas}
             sub={`CPA ${custoTotal > 0 && vendasTotal > 0 ? BRL(custoTotal / vendasTotal) : "N/A"}`} />
         </div>
-        <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 10, padding: 14 }}>
+        <div style={{
+          background: adsSem === 0 ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)",
+          border: `1px solid ${adsSem === 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
+          borderRadius: 10, padding: 14,
+        }}>
           <KpiCard label="Cruzamento RT↔CU" value={`${pctMatch}%`} sub={`${adsMatch} de ${totalAds} ads`}
             color={pctMatch >= 80 ? accent.green : accent.yellow} />
         </div>
@@ -147,11 +158,17 @@ export default function VisaoExecutiva() {
             </div>
 
             <div style={{
-              marginTop: 14, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
+              marginTop: 14,
+              background: adsSem === 0 ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+              border: `1px solid ${adsSem === 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
               borderRadius: 8, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: accent.red }}>{adsSem} Criativos Orfaos</span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: accent.red }}>sem rastreio</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: adsSem === 0 ? accent.green : accent.red }}>
+                {adsSem === 0 ? "Nenhum orfao" : `${adsSem} Criativos Orfaos`}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: adsSem === 0 ? accent.green : accent.red }}>
+                {adsSem === 0 ? "100% rastreado" : "sem rastreio"}
+              </span>
             </div>
           </div>
         </div>
