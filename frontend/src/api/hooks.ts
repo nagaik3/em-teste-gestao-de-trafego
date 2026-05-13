@@ -117,3 +117,10 @@ export function useDatalakePerformanceResumo() {
     queryFn: () => apiGet<any>("/api/datalake/performance/resumo"),
   })
 }
+
+export function useDatalakeSlasVolume() {
+  return useQuery<any>({
+    queryKey: ["dl-slas-volume"],
+    queryFn: () => apiGet<any>("/api/datalake/slas/volume"),
+  })
+}

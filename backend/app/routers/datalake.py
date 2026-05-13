@@ -41,7 +41,9 @@ def _require_admin(request: Request):
 @router.get("/performance/resumo")
 def performance_resumo(request: Request):
     _require_admin(request)
-    rows = _query("""
+
+    # MTD (Month to Date)
+    mtd = _query("""
         SELECT COUNT(*) AS total_ads,
                COALESCE(SUM(custo), 0) AS custo_total,
                COALESCE(SUM(fat_front), 0) AS fat_total,
@@ -51,8 +53,53 @@ def performance_resumo(request: Request):
                COUNT(*) FILTER (WHERE nicho IS NOT NULL) AS ads_com_match,
                COUNT(*) FILTER (WHERE nicho IS NULL) AS ads_sem_match
         FROM impera.view_performance_financeira
+        WHERE data_registro >= DATE_TRUNC('month', CURRENT_DATE)
     """)
-    return rows[0] if rows else {}
+    result = mtd[0] if mtd else {}
+
+    # Hoje
+    hoje = _query("""
+        SELECT COALESCE(SUM(custo), 0) AS custo,
+               COALESCE(SUM(fat_front), 0) AS fat,
+               COALESCE(SUM(vendas), 0) AS vendas,
+               ROUND(SUM(fat_front) / NULLIF(SUM(custo), 0), 2) AS roas
+        FROM impera.view_performance_financeira
+        WHERE data_registro = CURRENT_DATE
+    """)
+    h = hoje[0] if hoje else {}
+
+    # Ontem
+    ontem = _query("""
+        SELECT COALESCE(SUM(custo), 0) AS custo,
+               COALESCE(SUM(fat_front), 0) AS fat,
+               COALESCE(SUM(vendas), 0) AS vendas,
+               ROUND(SUM(fat_front) / NULLIF(SUM(custo), 0), 2) AS roas
+        FROM impera.view_performance_financeira
+        WHERE data_registro = CURRENT_DATE - 1
+    """)
+    o = ontem[0] if ontem else {}
+
+    # Deltas percentuais (hoje vs ontem)
+    def delta(atual, anterior):
+        a, b = float(atual or 0), float(anterior or 0)
+        if b == 0:
+            return None
+        return round((a - b) / b * 100, 1)
+
+    result["hoje_custo"] = float(h.get("custo", 0))
+    result["hoje_fat"] = float(h.get("fat", 0))
+    result["hoje_vendas"] = int(h.get("vendas", 0))
+    result["hoje_roas"] = float(h.get("roas") or 0)
+    result["ontem_custo"] = float(o.get("custo", 0))
+    result["ontem_fat"] = float(o.get("fat", 0))
+    result["ontem_vendas"] = int(o.get("vendas", 0))
+    result["ontem_roas"] = float(o.get("roas") or 0)
+    result["delta_fat"] = delta(h.get("fat"), o.get("fat"))
+    result["delta_custo"] = delta(h.get("custo"), o.get("custo"))
+    result["delta_vendas"] = delta(h.get("vendas"), o.get("vendas"))
+    result["delta_roas"] = delta(h.get("roas"), o.get("roas"))
+
+    return result
 
 
 @router.get("/performance/por-gestor")
@@ -115,6 +162,20 @@ def slas_resumo(request: Request):
     """)
 
 
+@router.get("/slas/volume")
+def slas_volume(request: Request):
+    """Volume entregue: transicoes concluidas na semana e no mes."""
+    _require_admin(request)
+    rows = _query("""
+        SELECT
+            COUNT(*) FILTER (WHERE data_saida >= DATE_TRUNC('week', CURRENT_DATE)) AS semana,
+            COUNT(*) FILTER (WHERE data_saida >= DATE_TRUNC('month', CURRENT_DATE)) AS mes
+        FROM impera.fact_slas_esteira
+        WHERE data_saida IS NOT NULL
+    """)
+    return rows[0] if rows else {"semana": 0, "mes": 0}
+
+
 # === ORFAOS ===
 
 @router.get("/orfaos/resumo")
@@ -151,6 +212,7 @@ def assertividade(request: Request):
             JOIN impera.dim_criativos_clickup d ON p.base_ref = d.base_ref
             WHERE d.copywriter IS NOT NULL AND p.vendas >= 10
               AND ROUND(p.fat_front / NULLIF(p.custo, 0), 2) >= 1.8
+              AND p.data_registro >= CURRENT_DATE - INTERVAL '30 days'
             GROUP BY d.copywriter
         ),
         testados AS (
@@ -160,7 +222,9 @@ def assertividade(request: Request):
                    SUM(p.vendas) AS vendas_total
             FROM impera.fact_performance_redtrack p
             JOIN impera.dim_criativos_clickup d ON p.base_ref = d.base_ref
-            WHERE d.copywriter IS NOT NULL GROUP BY d.copywriter
+            WHERE d.copywriter IS NOT NULL
+              AND p.data_registro >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY d.copywriter
         )
         SELECT pr.copywriter, pr.total_criativos,
                COALESCE(t.criativos_testados, 0) AS testados,

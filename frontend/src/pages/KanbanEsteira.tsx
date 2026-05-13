@@ -1,5 +1,5 @@
-import { useDatalakeSlasAtivos, useDatalakeSlasResumo } from "../api/hooks"
-import { gold, card, border, textSecondary } from "../styles/theme"
+import { useDatalakeSlasAtivos, useDatalakeSlasResumo, useDatalakeSlasVolume } from "../api/hooks"
+import { gold, card, border, textSecondary, textPrimary } from "../styles/theme"
 
 const COLUNAS = [
   { id: "Escrevendo - Copy", titulo: "Escrevendo (Copy)", cor: gold },
@@ -25,8 +25,10 @@ function fmt(h: number) {
 export default function KanbanEsteira() {
   const { data: cards } = useDatalakeSlasAtivos()
   const { data: resumo } = useDatalakeSlasResumo()
+  const { data: volume } = useDatalakeSlasVolume()
   const items = cards || []
   const resumoData = resumo || []
+  const vol = volume || { semana: 0, mes: 0 }
 
   const match = (fase: string, colId: string) => {
     if (colId === "Pre-Producao") return fase.toLowerCase().includes("pr") && fase.toLowerCase().includes("produ")
@@ -41,7 +43,12 @@ export default function KanbanEsteira() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <h2 style={{ color: gold, fontSize: 18, fontWeight: 700, margin: 0 }}>Kanban de Producao</h2>
-          <p style={{ color: textSecondary, fontSize: 12, margin: 0 }}>Pipeline unificado | Dados ao vivo do Data Lake</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+            <p style={{ color: textSecondary, fontSize: 12, margin: 0 }}>Pipeline unificado | Dados ao vivo</p>
+            <span style={{ fontSize: 11, color: textPrimary, fontWeight: 600, background: "rgba(255,255,255,0.04)", padding: "2px 8px", borderRadius: 4 }}>
+              Volume: {vol.semana} na semana | {vol.mes} no mes
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <span style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", padding: "3px 10px", borderRadius: 16, fontSize: 12, fontWeight: 600 }}>
