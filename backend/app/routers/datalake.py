@@ -43,42 +43,43 @@ def _require_admin(request: Request):
 
 @router.get("/performance/resumo")
 def performance_resumo(request: Request):
+    """Fonte: public.fato_performance (ETL diário via etl_dashboard.py)."""
     _require_admin(request)
 
     # MTD (Month to Date)
     mtd = _query("""
         SELECT COUNT(*) AS total_ads,
-               COALESCE(SUM(custo), 0) AS custo_total,
-               COALESCE(SUM(fat_front), 0) AS fat_total,
-               COALESCE(SUM(vendas), 0) AS vendas_total,
-               ROUND(SUM(fat_front) / NULLIF(SUM(custo), 0), 2) AS roas_geral,
-               ROUND((SUM(fat_front) * 0.74) - (SUM(custo) * 1.12), 2) AS mc_br_total,
-               COUNT(*) FILTER (WHERE nicho IS NOT NULL) AS ads_com_match,
-               COUNT(*) FILTER (WHERE nicho IS NULL) AS ads_sem_match
-        FROM impera.view_performance_financeira
-        WHERE data_registro >= DATE_TRUNC('month', CURRENT_DATE)::date
+               COALESCE(SUM(f.cost), 0) AS custo_total,
+               COALESCE(SUM(f.revenue_front), 0) AS fat_total,
+               COALESCE(SUM(f.vendas_total), 0) AS vendas_total,
+               ROUND(SUM(f.revenue_front) / NULLIF(SUM(f.cost), 0), 2) AS roas_geral,
+               ROUND((SUM(f.revenue_front) * 0.74) - (SUM(f.cost) * 1.12), 2) AS mc_br_total,
+               COUNT(*) FILTER (WHERE f.nicho_id IS NOT NULL) AS ads_com_match,
+               COUNT(*) FILTER (WHERE f.nicho_id IS NULL) AS ads_sem_match
+        FROM public.fato_performance f
+        WHERE f.data >= DATE_TRUNC('month', CURRENT_DATE)::date
     """)
     result = mtd[0] if mtd else {}
 
     # Hoje
     hoje = _query("""
-        SELECT COALESCE(SUM(custo), 0) AS custo,
-               COALESCE(SUM(fat_front), 0) AS fat,
-               COALESCE(SUM(vendas), 0) AS vendas,
-               ROUND(SUM(fat_front) / NULLIF(SUM(custo), 0), 2) AS roas
-        FROM impera.view_performance_financeira
-        WHERE data_registro = CURRENT_DATE
+        SELECT COALESCE(SUM(cost), 0) AS custo,
+               COALESCE(SUM(revenue_front), 0) AS fat,
+               COALESCE(SUM(vendas_total), 0) AS vendas,
+               ROUND(SUM(revenue_front) / NULLIF(SUM(cost), 0), 2) AS roas
+        FROM public.fato_performance
+        WHERE data = CURRENT_DATE
     """)
     h = hoje[0] if hoje else {}
 
     # Ontem
     ontem = _query("""
-        SELECT COALESCE(SUM(custo), 0) AS custo,
-               COALESCE(SUM(fat_front), 0) AS fat,
-               COALESCE(SUM(vendas), 0) AS vendas,
-               ROUND(SUM(fat_front) / NULLIF(SUM(custo), 0), 2) AS roas
-        FROM impera.view_performance_financeira
-        WHERE data_registro = CURRENT_DATE - 1
+        SELECT COALESCE(SUM(cost), 0) AS custo,
+               COALESCE(SUM(revenue_front), 0) AS fat,
+               COALESCE(SUM(vendas_total), 0) AS vendas,
+               ROUND(SUM(revenue_front) / NULLIF(SUM(cost), 0), 2) AS roas
+        FROM public.fato_performance
+        WHERE data = CURRENT_DATE - 1
     """)
     o = ontem[0] if ontem else {}
 
@@ -107,30 +108,48 @@ def performance_resumo(request: Request):
 
 @router.get("/performance/por-gestor")
 def performance_por_gestor(request: Request):
+    """Fonte: public.fato_performance + dim_gestor (ETL diário)."""
     _require_admin(request)
     return _query("""
-        SELECT gestor, COUNT(*) AS campanhas,
-               ROUND(SUM(custo)::numeric, 0) AS custo,
-               ROUND(SUM(fat_front)::numeric, 0) AS faturamento,
-               SUM(vendas) AS vendas,
-               ROUND(SUM(fat_front) / NULLIF(SUM(custo), 0), 2) AS roas,
-               ROUND((SUM(fat_front) * 0.74) - (SUM(custo) * 1.12), 2) AS mc_br
-        FROM impera.view_performance_financeira
-        GROUP BY gestor ORDER BY SUM(fat_front) DESC
+        SELECT g.nome AS gestor, COUNT(*) AS campanhas,
+               ROUND(SUM(f.cost)::numeric, 0) AS custo,
+               ROUND(SUM(f.revenue_front)::numeric, 0) AS faturamento,
+               SUM(f.vendas_total) AS vendas,
+               ROUND(SUM(f.revenue_front) / NULLIF(SUM(f.cost), 0), 2) AS roas,
+               ROUND((SUM(f.revenue_front) * 0.74) - (SUM(f.cost) * 1.12), 2) AS mc_br
+        FROM public.fato_performance f
+        LEFT JOIN public.dim_gestor g ON f.gestor_id = g.gestor_id
+        WHERE f.data >= DATE_TRUNC('month', CURRENT_DATE)::date
+        GROUP BY g.nome ORDER BY SUM(f.revenue_front) DESC
     """)
 
 
 @router.get("/performance/classificacao")
 def performance_classificacao(request: Request):
+    """Fonte: public.fato_performance (ETL diário) com classificação V5 inline."""
     _require_admin(request)
     return _query("""
         SELECT status_escala, COUNT(*) AS qtd,
                ROUND(SUM(custo)::numeric, 0) AS custo,
-               ROUND(SUM(fat_front)::numeric, 0) AS faturamento,
+               ROUND(SUM(fat)::numeric, 0) AS faturamento,
                SUM(vendas) AS vendas,
-               ROUND(SUM(fat_front) / NULLIF(SUM(custo), 0), 2) AS roas
-        FROM impera.view_performance_financeira
-        GROUP BY status_escala ORDER BY SUM(fat_front) DESC
+               ROUND(SUM(fat) / NULLIF(SUM(custo), 0), 2) AS roas
+        FROM (
+            SELECT cost AS custo, revenue_front AS fat, vendas_total AS vendas,
+                CASE
+                    WHEN vendas_total >= 30 AND ROUND(revenue_front / NULLIF(cost, 0), 2) >= 1.8 THEN 'Escala'
+                    WHEN vendas_total >= 10 AND ROUND(revenue_front / NULLIF(cost, 0), 2) >= 1.8 THEN 'Validado/Tracao'
+                    WHEN vendas_total >= 3 AND vendas_total <= 9
+                         AND ROUND(cost / NULLIF(vendas_total, 0)::numeric, 2) <= 180
+                         AND ROUND(revenue_front / NULLIF(cost, 0), 2) >= 1.8 THEN 'Pre-validado'
+                    WHEN cost >= 500 AND ROUND(revenue_front / NULLIF(cost, 0), 2) < 1.0 AND vendas_total = 0 THEN 'Negativo'
+                    WHEN cost >= 200 AND ROUND(revenue_front / NULLIF(cost, 0), 2) < 1.0 AND vendas_total <= 2 THEN 'Em Risco'
+                    ELSE 'Em Teste'
+                END AS status_escala
+            FROM public.fato_performance
+            WHERE data >= DATE_TRUNC('month', CURRENT_DATE)::date
+        ) sub
+        GROUP BY status_escala ORDER BY SUM(fat) DESC
     """)
 
 
