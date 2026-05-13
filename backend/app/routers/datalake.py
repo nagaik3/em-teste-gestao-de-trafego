@@ -53,7 +53,7 @@ def performance_resumo(request: Request):
                COUNT(*) FILTER (WHERE nicho IS NOT NULL) AS ads_com_match,
                COUNT(*) FILTER (WHERE nicho IS NULL) AS ads_sem_match
         FROM impera.view_performance_financeira
-        WHERE data_registro >= DATE_TRUNC('month', CURRENT_DATE)
+        WHERE data_registro >= DATE_TRUNC('month', CURRENT_DATE)::date
     """)
     result = mtd[0] if mtd else {}
 
@@ -169,7 +169,7 @@ def slas_volume(request: Request):
     rows = _query("""
         SELECT
             COUNT(*) FILTER (WHERE data_saida >= DATE_TRUNC('week', CURRENT_DATE)) AS semana,
-            COUNT(*) FILTER (WHERE data_saida >= DATE_TRUNC('month', CURRENT_DATE)) AS mes
+            COUNT(*) FILTER (WHERE data_saida >= DATE_TRUNC('month', CURRENT_DATE)::date) AS mes
         FROM impera.fact_slas_esteira
         WHERE data_saida IS NOT NULL
     """)
