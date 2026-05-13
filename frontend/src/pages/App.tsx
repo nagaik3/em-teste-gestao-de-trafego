@@ -69,7 +69,7 @@ function NavItem({ label, active, onClick }: { label: string; active: boolean; o
 export default function App() {
   const { user, logout } = useAuth()
   const role = user?.role || "visitante"
-  const isAdmin = role === "admin"
+  const isAdmin = ["admin", "ceo", "lider_edicao"].includes(role)
   const userGestorKey = user?.gestor_key || null
 
   const [selectedGestorKey, setSelectedGestorKey] = useState<string>(

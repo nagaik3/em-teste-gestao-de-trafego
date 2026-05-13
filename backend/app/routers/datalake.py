@@ -29,10 +29,13 @@ def _query(sql, params=None):
         conn.close()
 
 
+ALLOWED_ROLES = {"admin", "ceo", "lider_edicao"}
+
+
 def _require_admin(request: Request):
     user = get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
+    if user.get("role") not in ALLOWED_ROLES:
+        raise HTTPException(status_code=403, detail="Acesso restrito")
     return user
 
 
